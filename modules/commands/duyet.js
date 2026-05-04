@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const bold = require("../../utils/bold");
 
 module.exports.config = {
     name: "duyet",
@@ -28,32 +29,27 @@ module.exports.handleReply = async function ({ event, api, handleReply }) {
             fs.writeFileSync(dataPath, JSON.stringify(approvedThreads, null, 2));
             fs.writeFileSync(dataPendingPath, JSON.stringify([], null, 2));
             pendingThreads.forEach(id => {
-                api.sendMessage("✅ Your group has been approved!\n📝 Enjoy using the bot!", id);
+                api.sendMessage(`✅ ${bold('Approved!')}\n🎉 Your group has been approved!\n📝 Enjoy using the bot!`, id);
             });
-            return api.sendMessage(`✅ Approved all ${pendingThreads.length} pending groups`, threadID, messageID);
+            return api.sendMessage(`✅ ${bold('All Approved!')}\nApproved all ${pendingThreads.length} pending groups`, threadID, messageID);
         }
-
         const numbers = body.split(" ").map(num => parseInt(num.trim())).filter(num => !isNaN(num));
         let successCount = 0;
-
         for (let num of numbers) {
             const index = num - 1;
             if (index >= 0 && index < pendingThreads.length) {
                 const idBox = pendingThreads[index];
                 approvedThreads.push(idBox);
-                api.sendMessage("✅ Your group has been approved!\n📝 Enjoy using the bot!", idBox);
+                api.sendMessage(`✅ ${bold('Approved!')}\n🎉 Your group has been approved!\n📝 Enjoy using ${global.config.BOTNAME}!`, idBox);
                 pendingThreads.splice(index, 1);
                 successCount++;
             }
         }
-
         fs.writeFileSync(dataPath, JSON.stringify(approvedThreads, null, 2));
         fs.writeFileSync(dataPendingPath, JSON.stringify(pendingThreads, null, 2));
-
         return successCount > 0
-            ? api.sendMessage(`✅ Approved ${successCount} group(s)`, threadID, messageID)
-            : api.sendMessage("❎ No groups approved. Please check the numbers.", threadID, messageID);
-
+            ? api.sendMessage(`✅ ${bold('Approved')} ${successCount} group(s)`, threadID, messageID)
+            : api.sendMessage(`❎ No groups approved. Check the numbers.`, threadID, messageID);
     } else if (handleReply.type === "remove") {
         const idsToRemove = body.split(" ").map(num => parseInt(num) - 1).filter(index => approvedThreads[index]);
         if (idsToRemove.length) {
@@ -65,9 +61,9 @@ module.exports.handleReply = async function ({ event, api, handleReply }) {
                 await api.removeUserFromGroup(api.getCurrentUserID(), idBox);
             }
             fs.writeFileSync(dataPath, JSON.stringify(approvedThreads, null, 2));
-            return api.sendMessage(`✅ Removed groups: ${removedIds.join(", ")}`, threadID, messageID);
+            return api.sendMessage(`✅ ${bold('Removed groups:')} ${removedIds.join(", ")}`, threadID, messageID);
         }
-        return api.sendMessage("❎ No groups to remove.", threadID, messageID);
+        return api.sendMessage(`❎ No groups to remove.`, threadID, messageID);
     }
 };
 
@@ -78,78 +74,58 @@ module.exports.run = async ({ event, api, args, Threads }) => {
     let idBox = args[0] ? args[0] : threadID;
 
     if (args[0] === "list" || args[0] === "l") {
-        let msg = "[ Approved Groups ]\n";
+        let msg = `╔══════════════════╗\n║  ✅ ${bold('APPROVED GROUPS')} ║\n╚══════════════════╝\n\n`;
         for (let [index, id] of approvedThreads.entries()) {
             const threadData = await Threads.getData(id);
             const name = threadData?.threadInfo?.name || threadData?.threadInfo?.threadName || "Unknown";
-            msg += `\n${index + 1}. ${name}\n🧬 ID: ${id}`;
+            msg += `${index + 1}. ${bold(name)}\n   🆔 ${id}\n`;
         }
-        return api.sendMessage(`${msg}\n\n📌 Reply with the number to remove a group`, threadID, (error, info) => {
-            if (!error) {
-                global.client.handleReply.push({
-                    name: module.exports.config.name,
-                    messageID: info.messageID,
-                    author: event.senderID,
-                    type: "remove",
-                });
-            }
+        return api.sendMessage(msg + `\n💬 Reply with the number to remove a group`, threadID, (error, info) => {
+            if (!error) global.client.handleReply.push({ name: module.exports.config.name, messageID: info.messageID, author: event.senderID, type: "remove" });
         }, messageID);
     }
 
     if (args[0] === "pending" || args[0] === "p") {
-        let msg = `[ Pending Groups ]\n`;
+        let msg = `╔══════════════════╗\n║  🕐 ${bold('PENDING GROUPS')} ║\n╚══════════════════╝\n\n`;
         for (let [index, id] of pendingThreads.entries()) {
             let threadData = await Threads.getData(id);
             const name = threadData?.threadInfo?.name || threadData?.threadInfo?.threadName || "Unknown";
-            msg += `\n${index + 1}. ${name}\n🧬 ID: ${id}`;
+            msg += `${index + 1}. ${bold(name)}\n   🆔 ${id}\n`;
         }
-        return api.sendMessage(`${msg}\n\n📌 Reply with the number to approve (or "all" for all)`, threadID, (error, info) => {
-            if (!error) {
-                global.client.handleReply.push({
-                    name: module.exports.config.name,
-                    messageID: info.messageID,
-                    author: event.senderID,
-                    type: "pending",
-                });
-            }
+        return api.sendMessage(msg + `\n💬 Reply with number to approve (or "all")`, threadID, (error, info) => {
+            if (!error) global.client.handleReply.push({ name: module.exports.config.name, messageID: info.messageID, author: event.senderID, type: "pending" });
         }, messageID);
     }
 
     if (args[0] === "help" || args[0] === "h") {
         const threadData = await Threads.getData(String(threadID));
-        const prefix = (threadData?.data?.PREFIX) || global.config.PREFIX;
+        const prefix = threadData?.data?.PREFIX || global.config.PREFIX;
         return api.sendMessage(
-            `[ Group Approval ]\n\n` +
-            `${prefix}duyet l/list => view approved groups\n` +
-            `${prefix}duyet p/pending => view pending groups\n` +
-            `${prefix}duyet d/del [ID] => remove a group\n` +
-            `${prefix}duyet [ID] => approve a specific group`, threadID, messageID
+            `╔══════════════════╗\n║  📖 ${bold('DUYET HELP')}    ║\n╚══════════════════╝\n\n` +
+            `📋 ${prefix}duyet l/list → approved groups\n` +
+            `🕐 ${prefix}duyet p/pending → pending groups\n` +
+            `🗑️ ${prefix}duyet d/del [ID] → remove a group\n` +
+            `✅ ${prefix}duyet [ID] → approve a group`,
+            threadID, messageID
         );
     }
 
     if (args[0] === "del" || args[0] === "d") {
         idBox = args[1] || threadID;
-        if (!approvedThreads.includes(idBox)) {
-            return api.sendMessage("❎ This group was not previously approved.", threadID, messageID);
-        }
+        if (!approvedThreads.includes(idBox)) return api.sendMessage(`❎ Group not in approved list.`, threadID, messageID);
         approvedThreads = approvedThreads.filter(id => id !== idBox);
         fs.writeFileSync(dataPath, JSON.stringify(approvedThreads, null, 2));
         await api.removeUserFromGroup(api.getCurrentUserID(), idBox);
-        return api.sendMessage(`✅ Group ${idBox} removed from the list.`, threadID, messageID);
+        return api.sendMessage(`✅ ${bold('Removed')} group ${idBox}`, threadID, messageID);
     }
 
-    if (isNaN(parseInt(idBox))) {
-        return api.sendMessage("❎ Invalid group ID.", threadID, messageID);
-    }
-
-    if (approvedThreads.includes(idBox)) {
-        return api.sendMessage(`❎ Group ${idBox} is already approved.`, threadID, messageID);
-    }
+    if (isNaN(parseInt(idBox))) return api.sendMessage(`❎ Invalid group ID.`, threadID, messageID);
+    if (approvedThreads.includes(idBox)) return api.sendMessage(`❎ Group ${idBox} is already approved.`, threadID, messageID);
 
     approvedThreads.push(idBox);
     pendingThreads = pendingThreads.filter(id => id !== idBox);
     fs.writeFileSync(dataPath, JSON.stringify(approvedThreads, null, 2));
     fs.writeFileSync(dataPendingPath, JSON.stringify(pendingThreads, null, 2));
-    api.sendMessage("✅ Your group has been approved!\n📝 Enjoy using the bot!", idBox);
-    return api.sendMessage(`✅ Successfully approved group ${idBox}`, threadID, messageID);
+    api.sendMessage(`✅ ${bold('Approved!')}\n🎉 Your group has been approved!\n📝 Enjoy using ${global.config.BOTNAME}!`, idBox);
+    return api.sendMessage(`✅ ${bold('Successfully approved')} group ${idBox}`, threadID, messageID);
 };

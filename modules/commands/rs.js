@@ -1,3 +1,5 @@
+const bold = require('../../utils/bold');
+
 module.exports.config = {
     name: "rs",
     version: "1.0.0",
@@ -7,7 +9,13 @@ module.exports.config = {
     commandCategory: "Admin",
     usages: "[]",
     cooldowns: 0,
-    images: [],
 };
 
-module.exports.run = ({ event, api }) => api.sendMessage("✅ Restarting bot...", event.threadID, () => process.exit(1), event.messageID);
+module.exports.run = ({ event, api }) => {
+    api.sendMessage(
+        `🔄 ${bold('Restarting bot...')}\n⏳ Please wait a moment...`,
+        event.threadID,
+        () => process.exit(1),
+        event.messageID
+    );
+};

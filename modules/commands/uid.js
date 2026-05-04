@@ -1,3 +1,5 @@
+const bold = require('../../utils/bold');
+
 module.exports = {
     config: {
         name: "uid",
@@ -8,35 +10,41 @@ module.exports = {
         commandCategory: "Utilities",
         usages: "[reply / @mention / facebook link]",
         cooldowns: 0,
-        images: []
     },
     run: async function({ api, event, args }) {
         if (event.type === "message_reply") {
             const uid = event.messageReply.senderID;
-            return api.sendMessage(`${uid}`, event.threadID, event.messageID);
+            return api.sendMessage(
+                `🆔 ${bold('User ID')}\n\n📌 ${uid}`,
+                event.threadID, event.messageID
+            );
         }
         if (!args[0]) {
-            return api.sendMessage(`${event.senderID}`, event.threadID, event.messageID);
+            return api.sendMessage(
+                `🆔 ${bold('Your ID')}\n\n📌 ${event.senderID}`,
+                event.threadID, event.messageID
+            );
         } else {
             if (args[0].includes(".com/")) {
                 try {
                     const res_ID = await api.getUID(args[0]);
-                    return api.sendMessage(`${res_ID}`, event.threadID, event.messageID);
+                    return api.sendMessage(
+                        `🆔 ${bold('User ID')}\n\n📌 ${res_ID}\n🔗 ${args[0]}`,
+                        event.threadID, event.messageID
+                    );
                 } catch (error) {
-                    return api.sendMessage(`❌ Cannot get UID from this link!`, event.threadID, event.messageID);
+                    return api.sendMessage(`❌ ${bold('Cannot get UID from this link!')}`, event.threadID, event.messageID);
                 }
             } else {
                 for (const [key, value] of Object.entries(event.mentions)) {
-                    api.sendMessage(`${value.replace('@', '')}: ${key}`, event.threadID);
+                    api.sendMessage(`🆔 ${bold(value.replace('@', ''))}: ${key}`, event.threadID);
                 }
-                return;
             }
         }
     },
     handleEvent: async ({ api, event, args }) => {
         if (!event.body) return;
-        const bodyLower = event.body.toLowerCase();
-        if (bodyLower === "uid") {
+        if (event.body.toLowerCase() === "uid") {
             await module.exports.run({ api, event, args: [] });
         }
     }

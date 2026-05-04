@@ -1,72 +1,56 @@
 const fs = require('fs');
+const bold = require('../../utils/bold');
 
 module.exports.config = {
-  name: "admin",
-  version: "1.0.0",
-  hasPermssion: 1,
-  credits: "quocduy & AI",
-  description: "Manage admins",
-  commandCategory: "Admin",
-  usages: "admin list/add/remove [userID]",
-  cooldowns: 2,
-  dependencies: {
-    "fs-extra": ""
-  }
+    name: "admin",
+    version: "1.0.1",
+    hasPermssion: 3,
+    credits: "quocduy & AI",
+    description: "Manage bot admins",
+    commandCategory: "Admin",
+    usages: "admin [list/add/remove] [userID]",
+    cooldowns: 2,
 };
 
 module.exports.run = async function({ api, event, args }) {
-  const configPath = './config.json';
+    const configPath = './config.json';
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const admins = config.ADMINBOT || [];
+    const { threadID, messageID } = event;
 
-  // Load the config file
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-
-  // Get the list of admins
-  const admins = config.NDH || [];
-
-  // Handle different subcommands
-  switch (args[0]) {
-    case "list": 
-      if (admins.length === 0) {
-        api.sendMessage("There are no admins.", event.threadID, event.messageID);
-      } else {
-        const adminList = admins.map(admin => `- ${admin}`).join('\n');
-        api.sendMessage(`Admins:\n${adminList}`, event.threadID, event.messageID);
-      }
-      break;
-
-    case "add":
-      const newAdminID = args[1];
-      if (!newAdminID) {
-        api.sendMessage("Please provide a user ID to add as an admin.", event.threadID, event.messageID);
-        return;
-      }
-      if (admins.includes(newAdminID)) {
-        api.sendMessage("This user is already an admin.", event.threadID, event.messageID);
-        return;
-      }
-      admins.push(newAdminID);
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-      api.sendMessage(`Added ${newAdminID} as an admin.`, event.threadID, event.messageID);
-      break;
-
-    case "remove":
-      const adminToRemoveID = args[1];
-      if (!adminToRemoveID) {
-        api.sendMessage("Please provide a user ID to remove from admins.", event.threadID, event.messageID);
-        return;
-      }
-      if (!admins.includes(adminToRemoveID)) {
-        api.sendMessage("This user is not an admin.", event.threadID, event.messageID);
-        return;
-      }
-      const adminIndex = admins.indexOf(adminToRemoveID);
-      admins.splice(adminIndex, 1);
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-      api.sendMessage(`Removed ${adminToRemoveID} from admins.`, event.threadID, event.messageID);
-      break;
-
-    default:
-      api.sendMessage("Invalid subcommand. Usage: admin list/add/remove [userID]", event.threadID, event.messageID);
-      break;
-  }
+    switch (args[0]) {
+        case "list": {
+            if (admins.length === 0) return api.sendMessage(`📋 ${bold('No bot admins found.')}`, threadID, messageID);
+            let msg = `╔══════════════════╗\n║  👑 ${bold('BOT ADMINS')}    ║\n╚══════════════════╝\n\n`;
+            admins.forEach((id, i) => { msg += `${i + 1}. 🆔 ${id}\n`; });
+            return api.sendMessage(msg, threadID, messageID);
+        }
+        case "add": {
+            const newID = args[1];
+            if (!newID) return api.sendMessage(`⚠️ ${bold('Please provide a user ID.')}`, threadID, messageID);
+            if (admins.includes(newID)) return api.sendMessage(`❎ ${bold('Already an admin:')} ${newID}`, threadID, messageID);
+            admins.push(newID);
+            config.ADMINBOT = admins;
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+            global.config.ADMINBOT = admins;
+            return api.sendMessage(`✅ ${bold('Added admin:')} ${newID}`, threadID, messageID);
+        }
+        case "remove": {
+            const removeID = args[1];
+            if (!removeID) return api.sendMessage(`⚠️ ${bold('Please provide a user ID.')}`, threadID, messageID);
+            if (!admins.includes(removeID)) return api.sendMessage(`❎ ${bold('Not an admin:')} ${removeID}`, threadID, messageID);
+            config.ADMINBOT = admins.filter(id => id !== removeID);
+            fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+            global.config.ADMINBOT = config.ADMINBOT;
+            return api.sendMessage(`✅ ${bold('Removed admin:')} ${removeID}`, threadID, messageID);
+        }
+        default:
+            return api.sendMessage(
+                `╔══════════════════╗\n║  📖 ${bold('ADMIN HELP')}   ║\n╚══════════════════╝\n\n` +
+                `📋 admin list → view all admins\n` +
+                `➕ admin add [ID] → add admin\n` +
+                `➖ admin remove [ID] → remove admin`,
+                threadID, messageID
+            );
+    }
 };

@@ -1,3 +1,5 @@
+const bold = require('../../utils/bold');
+
 module.exports.config = {
     name: "ping",
     version: "1.0.5",
@@ -12,13 +14,11 @@ module.exports.config = {
 module.exports.run = async function({ api, event, args }) {
     try {
         const botID = api.getCurrentUserID();
-        var listAFK, listUserID;
-        global.moduleData["afk"] && global.moduleData["afk"].afkList
-            ? listAFK = Object.keys(global.moduleData["afk"].afkList || [])
-            : listAFK = [];
-        listUserID = event.participantIDs.filter(ID => ID != botID && ID != event.senderID);
-        listUserID = listUserID.filter(item => !listAFK.includes(item));
-        var body = (args.length != 0) ? args.join(" ") : "You have been mentioned by the admin.", mentions = [], index = 0;
+        var listAFK = global.moduleData["afk"]?.afkList ? Object.keys(global.moduleData["afk"].afkList) : [];
+        var listUserID = event.participantIDs.filter(ID => ID != botID && ID != event.senderID && !listAFK.includes(ID));
+
+        var body = args.length ? args.join(" ") : `📣 ${bold('You have been mentioned by the admin!')}`;
+        var mentions = [], index = 0;
         for (const idUser of listUserID) {
             body = "‎" + body;
             mentions.push({ id: idUser, tag: "‎", fromIndex: index - 1 });
@@ -26,6 +26,6 @@ module.exports.run = async function({ api, event, args }) {
         }
         return api.sendMessage({ body, mentions }, event.threadID, event.messageID);
     } catch (e) {
-        return console.log(e);
+        console.log(e);
     }
 };

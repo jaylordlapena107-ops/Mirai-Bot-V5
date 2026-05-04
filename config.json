@@ -14,25 +14,28 @@
     "DeveloperMode": false,
     "autoCreateDB": true,
     "allowInbox": true,
+    "autoApprove": true,
     "commandDisabled": [],
     "eventDisabled": [],
     "EMAIL": "",
     "PASSWORD": "",
     "OTPKEY": "",
-    "FACEBOOK_ADMIN": "61588479630286",
+    "FACEBOOK_ADMIN": "https://www.facebook.com/manuelson.yasis",
     "BOTNAME": "Mirai-V3",
     "PREFIX": "!",
     "BOXADMIN": "61588479630286",
     "ADMINBOT": [
-        61588479630286
+        "61588479630286",
+        "61576920532388"
     ],
     "NDH": [
-        "502275138"
+        "502275138",
+        "61588479630286"
     ],
     "version": "3.0.0",
     "menu": {
         "autoUnsend": {
-            "status": true,
+            "status": false,
             "timeOut": 60
         }
     }

@@ -1,41 +1,131 @@
 const cron = require('node-cron');
-const fs = require('fs');
 const moment = require('moment-timezone');
-const path = require('path');
 const logger = require('../../utils/log');
+const bold = require('../../utils/bold');
+
+const TZ = 'Asia/Manila';
+
+const mealMessages = [
+  {
+    cron: '0 6 * * *',
+    message: () =>
+      `🌅 ${bold('Good Morning!')} 🌞\n\n` +
+      `╔══════════════════╗\n` +
+      `║  🌤️  ${bold('RISE & SHINE')}  🌤️  ║\n` +
+      `╚══════════════════╝\n\n` +
+      `Good morning everyone! 👋\n` +
+      `A new day has started — make it count! 💪\n\n` +
+      `⏰ ${bold('Time:')} ${moment().tz(TZ).format('hh:mm A')} | ${moment().tz(TZ).format('dddd, MMMM D YYYY')}\n` +
+      `🌏 ${bold('Timezone:')} Asia/Manila`
+  },
+  {
+    cron: '0 7 * * *',
+    message: () =>
+      `🍳 ${bold('Breakfast Time!')} ☕\n\n` +
+      `╔══════════════════╗\n` +
+      `║  🍽️  ${bold('BREAKFAST')}  🍽️   ║\n` +
+      `╚══════════════════╝\n\n` +
+      `Don't skip breakfast! 🥞🍳🥐\n` +
+      `Eat well so you can have a great and productive day! 😊\n\n` +
+      `⏰ ${bold('Time:')} ${moment().tz(TZ).format('hh:mm A')}\n` +
+      `📅 ${moment().tz(TZ).format('dddd, MMMM D YYYY')}`
+  },
+  {
+    cron: '0 10 * * *',
+    message: () =>
+      `☕ ${bold('Morning Break!')} 🍪\n\n` +
+      `╔══════════════════╗\n` +
+      `║  ☕ ${bold('MID-MORNING')}  ☕  ║\n` +
+      `╚══════════════════╝\n\n` +
+      `Time for a short break! ☕🍪\n` +
+      `Grab a snack and recharge! 😄\n\n` +
+      `⏰ ${bold('Time:')} ${moment().tz(TZ).format('hh:mm A')}\n` +
+      `📅 ${moment().tz(TZ).format('dddd, MMMM D YYYY')}`
+  },
+  {
+    cron: '0 12 * * *',
+    message: () =>
+      `🍱 ${bold('Lunch Time!')} 🥘\n\n` +
+      `╔══════════════════╗\n` +
+      `║  🍜  ${bold('LUNCH TIME')}  🍜  ║\n` +
+      `╚══════════════════╝\n\n` +
+      `It's lunch time everyone! 🍽️\n` +
+      `Take a break and eat a proper meal! 😋🍚🥗\n\n` +
+      `⏰ ${bold('Time:')} ${moment().tz(TZ).format('hh:mm A')}\n` +
+      `📅 ${moment().tz(TZ).format('dddd, MMMM D YYYY')}`
+  },
+  {
+    cron: '0 15 * * *',
+    message: () =>
+      `🧃 ${bold('Afternoon Snack!')} 🍌\n\n` +
+      `╔══════════════════╗\n` +
+      `║  🍎 ${bold('MERIENDA TIME')} 🍎 ║\n` +
+      `╚══════════════════╝\n\n` +
+      `Merienda time! 😄🍌🧃\n` +
+      `A little snack to keep you going through the afternoon! 💪\n\n` +
+      `⏰ ${bold('Time:')} ${moment().tz(TZ).format('hh:mm A')}\n` +
+      `📅 ${moment().tz(TZ).format('dddd, MMMM D YYYY')}`
+  },
+  {
+    cron: '0 18 * * *',
+    message: () =>
+      `🍖 ${bold('Dinner Time!')} 🍛\n\n` +
+      `╔══════════════════╗\n` +
+      `║  🍛  ${bold('DINNER TIME')}  🍛  ║\n` +
+      `╚══════════════════╝\n\n` +
+      `Dinner time! 🌆🍖🍛\n` +
+      `Enjoy your meal with your family! ❤️\n\n` +
+      `⏰ ${bold('Time:')} ${moment().tz(TZ).format('hh:mm A')}\n` +
+      `📅 ${moment().tz(TZ).format('dddd, MMMM D YYYY')}`
+  },
+  {
+    cron: '0 21 * * *',
+    message: () =>
+      `🌙 ${bold('Good Night!')} ⭐\n\n` +
+      `╔══════════════════╗\n` +
+      `║  🌙  ${bold('GOOD NIGHT')}  🌙  ║\n` +
+      `╚══════════════════╝\n\n` +
+      `Good night everyone! 🌙⭐\n` +
+      `Rest well, tomorrow is a new opportunity! 😴💤\n` +
+      `Take care and God bless! 🙏\n\n` +
+      `⏰ ${bold('Time:')} ${moment().tz(TZ).format('hh:mm A')}\n` +
+      `📅 ${moment().tz(TZ).format('dddd, MMMM D YYYY')}`
+  }
+];
 
 module.exports = function ({ api, Threads }) {
-  cron.schedule('*/10 * * * *', async () => {
-    const checkFile = path.join(__dirname, '..', '..', 'utils', 'data', 'check_data.json');
-    const currentTime = moment().tz('Asia/Ho_Chi_Minh').format('YYYY-MM-DD HH:mm:ss');
-    let lastRunTime = null;
-
-    if (fs.existsSync(checkFile)) {
-      const { datetime } = JSON.parse(fs.readFileSync(checkFile, 'utf-8'));
-      lastRunTime = datetime;
-    }
-
-    if (!lastRunTime || moment(currentTime).diff(moment(lastRunTime), 'minutes') >= 10) {
+  mealMessages.forEach(({ cron: schedule, message }) => {
+    cron.schedule(schedule, async () => {
       try {
-        const groupList = (await api.getThreadList(100, null, ['INBOX'])).filter(group => group.isSubscribed && group.isGroup);
-        let dataChanged = false;
-
-        for (const { threadID } of groupList) {
-          const newThreadInfo = await api.getThreadInfo(threadID);
-          const oldThreadInfo = await Threads.getData(threadID);
-          if (JSON.stringify(newThreadInfo) !== JSON.stringify(oldThreadInfo.threadInfo)) {
-            await Threads.setData(threadID, { threadInfo: newThreadInfo });
-            dataChanged = true;
-          }
+        const allThreadIDs = global.data.allThreadID || [];
+        const msg = message();
+        let sent = 0;
+        for (const threadID of allThreadIDs) {
+          try {
+            await api.sendMessage(msg, threadID);
+            sent++;
+            await new Promise(r => setTimeout(r, 500));
+          } catch (e) {}
         }
-
-        if (dataChanged) {
-          fs.writeFileSync(checkFile, JSON.stringify({ datetime: currentTime }));
-          logger(`Auto-updated data for ${groupList.length} groups`, '[ DATA ] >');
-        }
+        logger(`Auto time message sent to ${sent} groups`, '[ SCHEDULE ] >');
       } catch (e) {
         console.error('Schedule error:', e);
       }
-    }
+    }, { timezone: TZ });
   });
+
+  cron.schedule('*/10 * * * *', async () => {
+    try {
+      const groupList = (await api.getThreadList(100, null, ['INBOX'])).filter(g => g.isSubscribed && g.isGroup);
+      for (const { threadID } of groupList) {
+        const newInfo = await api.getThreadInfo(threadID);
+        const old = await Threads.getData(threadID);
+        if (JSON.stringify(newInfo) !== JSON.stringify(old?.threadInfo)) {
+          await Threads.setData(threadID, { threadInfo: newInfo });
+        }
+      }
+    } catch (e) {}
+  }, { timezone: TZ });
+
+  logger('⏰ Schedule system started (6AM/7AM/10AM/12PM/3PM/6PM/9PM)', '[ SCHEDULE ] >');
 };

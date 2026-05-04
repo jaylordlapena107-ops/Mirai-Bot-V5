@@ -1,3 +1,5 @@
+const bold = require('../../utils/bold');
+
 module.exports.config = {
     name: "prefix",
     version: "2.0.0",
@@ -16,19 +18,15 @@ module.exports.handleEvent = async function ({ api, event }) {
     const { PREFIX } = global.config;
     let threadSetting = global.data.threadData.get(threadID) || {};
     let prefix = threadSetting.PREFIX || PREFIX;
-
     const lowerBody = body.toLowerCase().trim();
 
-    if (
-        lowerBody === "prefix" ||
-        lowerBody === "what is the prefix" ||
-        lowerBody === "forgot prefix" ||
-        lowerBody === "how to use"
-    ) {
+    if (["prefix","what is the prefix","forgot prefix","how to use"].includes(lowerBody)) {
         api.sendMessage(
-            `✏️ Group prefix: ${prefix}\n📎 System prefix: ${PREFIX}`,
-            threadID,
-            event.messageID
+            `╔══════════════════╗\n║  ⌨️ ${bold('PREFIX INFO')}    ║\n╚══════════════════╝\n\n` +
+            `📌 ${bold('Group Prefix:')} ${prefix}\n` +
+            `⚙️ ${bold('System Prefix:')} ${PREFIX}\n\n` +
+            `💡 Example: ${prefix}help`,
+            threadID, event.messageID
         );
     }
 };
