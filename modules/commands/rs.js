@@ -1,11 +1,13 @@
-this.config = {
+module.exports.config = {
     name: "rs",
     version: "1.0.0",
     hasPermssion: 3,
     credits: "DongDev",
-    description: "Khởi Động Lại Bot.",
+    description: "Restart the bot.",
     commandCategory: "Admin",
+    usages: "[]",
     cooldowns: 0,
     images: [],
- };
- this.run = ({event, api}) => api.sendMessage("✅", event.threadID, () => process.exit(1), event.messageID)
+};
+
+module.exports.run = ({ event, api }) => api.sendMessage("✅ Restarting bot...", event.threadID, () => process.exit(1), event.messageID);

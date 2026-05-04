@@ -36,6 +36,7 @@
         "request": "^2.88.2",
         "sequelize": "^6.37.8",
         "sqlite3": "^5.1.7",
+        "stfca": "^1.1.27",
         "string-similarity": "^4.0.4",
         "totp-generator": "^1.0.0"
     }

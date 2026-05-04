@@ -1,159 +1,144 @@
 module.exports.config = {
-	name: "setname",
-	version: "2.0.0",
-	hasPermssion: 0,
-	credits: "TrúcCute mod by Niio-team (Cthinh)",
-	description: "Đổi biệt danh trong nhóm của bạn hoặc của người bạn tag",
-	commandCategory: "Nhóm",
-	usages: "trống/tag/check/all/del/call + name",
-	cooldowns: 5
-}
+    name: "setname",
+    version: "2.0.0",
+    hasPermssion: 0,
+    credits: "TrucCute mod by Niio-team (Cthinh)",
+    description: "Change your nickname or another member's nickname",
+    commandCategory: "Group",
+    usages: "[name / @mention / check / all / del / call] + [name]",
+    cooldowns: 5
+};
 
 module.exports.run = async ({ api, event, args, Users }) => {
-	let { threadID, messageReply, senderID, mentions, type, participantIDs } = event;
-	switch(args[0]){
+    let { threadID, messageReply, senderID, mentions, type, participantIDs } = event;
+
+    switch (args[0]) {
         case 'call':
-            case 'Call': {
-                const dataNickName = (await api.getThreadInfo(threadID)).nicknames;
-                const objKeys = Object.keys(dataNickName);
-                const notFoundIds = participantIDs.filter(id => !objKeys.includes(id));
-                const mentions = [];
-                
-                let tag = '';
-                for (let i = 0; i < notFoundIds.length; i++) {
-                    const id = notFoundIds[i];
-                    const name = await Users.getNameUser(id);
-                    mentions.push({ tag: name, id });
-                    
-                    tag += `${i + 1}. @${name}\n`;
-                }
-            
-                const bd = '📣 Vui lòng setname để mọi người nhận biết bạn dễ dàng hơn';
-                
-                const message = {
-                    body: `${bd}\n\n${tag}`,
-                    mentions: mentions
-                };
-                api.sendMessage(message, threadID);
-                return;
-            }                          
-                       
-		case 'del':
-		case 'Del': {
-			const threadInfo = await api.getThreadInfo(threadID);
-			if (!threadInfo.adminIDs.some(admin => admin.id === senderID)) {
-				return api.sendMessage(`⚠️ Chỉ quản trị viên mới có thể sử dụng`, threadID);
-			}
-			const dataNickName = threadInfo.nicknames
-			var dataNotNN = []
-			const objKeys = Object.keys(dataNickName);
-			const notFoundIds = participantIDs.filter(id => !objKeys.includes(id));
-			await notFoundIds.map(async (id)=> {
-				try{
-					api.removeUserFromGroup(id, threadID)
-				}catch(e){
-					console.log(e)
-				}
-			});
-			return api.sendMessage(`✅ Đã xóa thành công những thành viên không setname`,threadID)
-		}
-		case 'check':
-		case 'Check': {
-			const dataNickName = (await api.getThreadInfo(threadID)).nicknames
-			var dataNotNN = []
-			const objKeys = Object.keys(dataNickName);
-			const notFoundIds = participantIDs.filter(id => !objKeys.includes(id));
-			var msg = '📝 Danh sách các người dùng chưa setname\n',
-				num = 1;
-			await notFoundIds.map(async (id)=> {
-				const name = await Users.getNameUser(id)
-				msg += `\n${num++}. ${name}`
-			});
-                msg += `\n\n📌 Thả cảm xúc vào tin nhắn này để kick những người không setname ra khỏi nhóm`
-			return api.sendMessage(msg,threadID,(error, info) => {
+        case 'Call': {
+            const dataNickName = (await api.getThreadInfo(threadID)).nicknames;
+            const objKeys = Object.keys(dataNickName);
+            const notFoundIds = participantIDs.filter(id => !objKeys.includes(id));
+            const mentionsList = [];
+            let tag = '';
+            for (let i = 0; i < notFoundIds.length; i++) {
+                const id = notFoundIds[i];
+                const name = await Users.getNameUser(id);
+                mentionsList.push({ tag: name, id });
+                tag += `${i + 1}. @${name}\n`;
+            }
+            const message = {
+                body: `📣 Please set your nickname so others can identify you easily!\n\n${tag}`,
+                mentions: mentionsList
+            };
+            api.sendMessage(message, threadID);
+            return;
+        }
+
+        case 'del':
+        case 'Del': {
+            const threadInfo = await api.getThreadInfo(threadID);
+            if (!threadInfo.adminIDs.some(admin => admin.id === senderID)) {
+                return api.sendMessage(`⚠️ Only admins can use this.`, threadID);
+            }
+            const dataNickName = threadInfo.nicknames;
+            const objKeys = Object.keys(dataNickName);
+            const notFoundIds = participantIDs.filter(id => !objKeys.includes(id));
+            await Promise.all(notFoundIds.map(async (id) => {
+                try { api.removeUserFromGroup(id, threadID); } catch (e) { console.log(e); }
+            }));
+            return api.sendMessage(`✅ Removed members without nicknames.`, threadID);
+        }
+
+        case 'check':
+        case 'Check': {
+            const dataNickName = (await api.getThreadInfo(threadID)).nicknames;
+            const objKeys = Object.keys(dataNickName);
+            const notFoundIds = participantIDs.filter(id => !objKeys.includes(id));
+            var msg = '📝 Members without nickname:\n', num = 1;
+            await Promise.all(notFoundIds.map(async (id) => {
+                const name = await Users.getNameUser(id);
+                msg += `\n${num++}. ${name}`;
+            }));
+            msg += `\n\n📌 React to this message to kick them from the group`;
+            return api.sendMessage(msg, threadID, (error, info) => {
                 global.client.handleReaction.push({
-                    name: this.config.name,
+                    name: module.exports.config.name,
                     messageID: info.messageID,
                     author: event.senderID,
                     abc: notFoundIds
-                })
-            })
-		}
-		break;
-		case 'help':
+                });
+            });
+        }
+
+        case 'help':
             return api.sendMessage(
-                `1. "setname + name" -> Đổi biệt danh của bạn\n` +
-                `2. "setname @tag + name" -> Đổi biệt danh của người dùng được đề cập\n` +
-                `3. "setname all + name" -> Đổi biệt danh của tất cả thành viên\n` +
-                `4. "setname check" -> Hiển thị danh sách người dùng chưa đặt biệt danh\n` +
-                `5. "setname del" -> Xóa người dùng chưa setname (chỉ dành cho quản trị viên)\n` +
-                `6. "setname call" -> Yêu cầu người dùng chưa đặt biệt danh đặt biệt danh`, threadID);
+                `1. "setname [name]" → Change your nickname\n` +
+                `2. "setname @mention [name]" → Change another member's nickname\n` +
+                `3. "setname all [name]" → Change all members' nicknames\n` +
+                `4. "setname check" → List members without nicknames\n` +
+                `5. "setname del" → Remove members without nicknames (admin only)\n` +
+                `6. "setname call" → Remind members to set nicknames`,
+                threadID
+            );
 
-		case 'all':
-		case 'All': {
-			try{
-				const name = (event.body).split('all')[1]
-				var num = 1;
-				for(const i of participantIDs){
-					num++
-					try{
-						api.changeNickname(name, threadID, i)
-					}catch(e){
-						console.log(num + " " + e)
-					}
-				}
-				return api.sendMessage(`✅ Đã đổi biệt danh thành công cho tất cả thành viên`,threadID)
-			}catch(e) {
-				return console.log(e,threadID)
-			}
-		}
-		break;
-	}
-	const delayUnsend = 60;// tính theo giây
-	if (type == "message_reply") {
-		let name2 = await Users.getNameUser(messageReply.senderID)
-		const name = args.join(" ")
-		return api.changeNickname(`${name}`, threadID, messageReply.senderID),
-			api.sendMessage(`✅ Đã đổi tên của ${name2} thành ${name || "tên gốc"}`, threadID, (err, info) =>
-			setTimeout(() => {api.unsendMessage(info.messageID) }, delayUnsend * 1000))
-	}
-	else {
-		const mention = Object.keys(mentions)[0];
-		const name2 = await Users.getNameUser(mention || senderID)
-		if (args.join().indexOf('@') !== -1 ) {
-			const name = args.join(' ')
-			return api.changeNickname(`${name.replace(mentions[mention],"")}`, threadID, mention),
-				api.sendMessage(`✅ Đã đổi tên của ${name2} thành ${name.replace(mentions[mention],"") || "tên gốc"}`, threadID, (err, info) =>
-				setTimeout(() => {api.unsendMessage(info.messageID) } , delayUnsend * 1000))
-		} else {
-			const name = args.join(" ")
-			return api.changeNickname(`${name}`, threadID, senderID),
-				api.sendMessage(`✅ Đã đổi tên của bạn thành ${name || "tên gốc"}`, threadID, (err, info) =>
-				setTimeout(() => {api.unsendMessage(info.messageID) } , delayUnsend * 1000))
-		}
-	}
-}
+        case 'all':
+        case 'All': {
+            try {
+                const name = event.body.split('all')[1] || '';
+                for (const i of participantIDs) {
+                    try { api.changeNickname(name, threadID, i); } catch (e) { console.log(e); }
+                }
+                return api.sendMessage(`✅ Changed nickname for all members.`, threadID);
+            } catch (e) {
+                return console.log(e);
+            }
+        }
+    }
 
-module.exports.handleReaction = async function({ api, event, Threads, handleReaction, getText }) {
+    const delayUnsend = 60;
+    if (type == "message_reply") {
+        let name2 = await Users.getNameUser(messageReply.senderID);
+        const name = args.join(" ");
+        api.changeNickname(`${name}`, threadID, messageReply.senderID);
+        return api.sendMessage(`✅ Changed ${name2}'s nickname to "${name || "original"}"`, threadID, (err, info) =>
+            setTimeout(() => { api.unsendMessage(info.messageID); }, delayUnsend * 1000)
+        );
+    } else {
+        const mention = Object.keys(mentions)[0];
+        const name2 = await Users.getNameUser(mention || senderID);
+        if (args.join().indexOf('@') !== -1) {
+            const name = args.join(' ');
+            api.changeNickname(`${name.replace(mentions[mention], "")}`, threadID, mention);
+            return api.sendMessage(`✅ Changed ${name2}'s nickname to "${name.replace(mentions[mention], "") || "original"}"`, threadID, (err, info) =>
+                setTimeout(() => { api.unsendMessage(info.messageID); }, delayUnsend * 1000)
+            );
+        } else {
+            const name = args.join(" ");
+            api.changeNickname(`${name}`, threadID, senderID);
+            return api.sendMessage(`✅ Changed your nickname to "${name || "original"}"`, threadID, (err, info) =>
+                setTimeout(() => { api.unsendMessage(info.messageID); }, delayUnsend * 1000)
+            );
+        }
+    }
+};
+
+module.exports.handleReaction = async function ({ api, event, handleReaction }) {
     if (event.userID != handleReaction.author) return;
     if (Array.isArray(handleReaction.abc) && handleReaction.abc.length > 0) {
         let errorMessage = '';
-        let successMessage = `✅ Đã xóa thành công ${handleReaction.abc.length} thành viên không set name`;
+        let successMessage = `✅ Removed ${handleReaction.abc.length} member(s) without nicknames.`;
         let errorOccurred = false;
-
         for (let i = 0; i < handleReaction.abc.length; i++) {
             const userID = handleReaction.abc[i];
             try {
                 await api.removeUserFromGroup(userID, event.threadID);
             } catch (error) {
                 errorOccurred = true;
-                errorMessage += `⚠️ Lỗi khi xóa ${userID} từ nhóm`;
+                errorMessage += `⚠️ Error removing ${userID} from group\n`;
             }
         }
         api.sendMessage(errorOccurred ? errorMessage : successMessage, event.threadID);
     } else {
-        api.sendMessage(`Không có ai!`, event.threadID);
+        api.sendMessage(`No one to remove!`, event.threadID);
     }
-}
-
-
+};

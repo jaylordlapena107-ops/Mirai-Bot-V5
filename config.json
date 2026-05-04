@@ -10,7 +10,7 @@
         "autoMarkDelivery": false,
         "autoReconnect": true
     },
-    "language": "vi",
+    "language": "en",
     "DeveloperMode": false,
     "autoCreateDB": true,
     "allowInbox": true,
@@ -19,11 +19,13 @@
     "EMAIL": "",
     "PASSWORD": "",
     "OTPKEY": "",
-    "FACEBOOK_ADMIN": "",
-    "BOTNAME": "Mirai-V3-Unofficial",
+    "FACEBOOK_ADMIN": "61588479630286",
+    "BOTNAME": "Mirai-V3",
     "PREFIX": "!",
-    "BOXADMIN": "6804616456270022",
-    "ADMINBOT": [],
+    "BOXADMIN": "61588479630286",
+    "ADMINBOT": [
+        61588479630286
+    ],
     "NDH": [
         "502275138"
     ],

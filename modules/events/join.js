@@ -1,59 +1,68 @@
 module.exports.config = {
-	name: "joinNoti",
-	eventType: ["log:subscribe"],
-	version: "1.0.3",
-	credits: "Mirai Team",
-	description: "Thông báo bot hoặc người vào nhóm",
-	dependencies: {
-		"fs-extra": ""
-	}
+    name: "joinNoti",
+    eventType: ["log:subscribe"],
+    version: "1.0.3",
+    credits: "Mirai Team",
+    description: "Notify when bot or user joins a group",
+    dependencies: {
+        "fs-extra": ""
+    }
 };
 
 module.exports.run = async function({ api, event, Users }) {
-	const { join } = global.nodemodule["path"];
-	const { threadID } = event;
-	if (event.logMessageData.addedParticipants.some(i => i.userFbId == api.getCurrentUserID())) {
-		api.changeNickname(`[ ${global.config.PREFIX} ] • ${(!global.config.BOTNAME) ? "Kết nối thành công :<" : global.config.BOTNAME}`, threadID, api.getCurrentUserID());
-		return api.sendMessage(`Hellooooooooooooooooooooooooooooooooooooooo <3`, threadID);
-	}
-	else {
-		try {
-			const { createReadStream, existsSync, mkdirSync } = global.nodemodule["fs-extra"];
-			let { threadName, participantIDs } = await api.getThreadInfo(threadID);
+    const fs = require('fs-extra');
+    const path = require('path');
+    const { threadID } = event;
 
-			const threadData = global.data.threadData.get(parseInt(threadID)) || {};
-			const path = join(__dirname, "cache", "joinGif");
-			const pathGif = join(path, `${threadID}.gif`);
+    if (event.logMessageData.addedParticipants.some(i => i.userFbId == api.getCurrentUserID())) {
+        api.changeNickname(`[ ${global.config.PREFIX} ] • ${global.config.BOTNAME || "Mirai Bot"}`, threadID, api.getCurrentUserID());
+        return api.sendMessage(`Hello everyone! I'm ${global.config.BOTNAME || "Mirai Bot"} 👋`, threadID);
+    } else {
+        try {
+            const { threadName, participantIDs } = await api.getThreadInfo(threadID);
+            const threadData = global.data.threadData.get(parseInt(threadID)) || {};
+            const cachePath = path.join(__dirname, "cache", "joinGif");
+            const pathGif = path.join(cachePath, `${threadID}.gif`);
 
-			var mentions = [], nameArray = [], memLength = [], i = 0;
-			
-			for (id in event.logMessageData.addedParticipants) {
-				const userName = event.logMessageData.addedParticipants[id].fullName;
-				nameArray.push(userName);
-				mentions.push({ tag: userName, id });
-				memLength.push(participantIDs.length - i++);
+            var mentions = [], nameArray = [], memLength = [], i = 0;
 
-				if (!global.data.allUserID.includes(id)) {
-					await Users.createData(id, { name: userName, data: {} });
-					global.data.allUserID.push(id);
-					logger(global.getText("handleCreateDatabase", "newUser", id), "[ DATABASE ]");
-				}
-			}
-			memLength.sort((a, b) => a - b);
-			
-			(typeof threadData.customJoin == "undefined") ? msg = "👋Welcome {name}.\nChào mừng đã đến với {threadName}.\n{type} là thành viên thứ {soThanhVien} của nhóm 🥳" : msg = threadData.customJoin;
-			msg = msg
-			.replace(/\{name}/g, nameArray.join(', '))
-			.replace(/\{type}/g, (memLength.length > 1) ?  'các bạn' : 'bạn')
-			.replace(/\{soThanhVien}/g, memLength.join(', '))
-			.replace(/\{threadName}/g, threadName);
+            for (const id in event.logMessageData.addedParticipants) {
+                const userName = event.logMessageData.addedParticipants[id].fullName;
+                const userFbId = event.logMessageData.addedParticipants[id].userFbId;
+                nameArray.push(userName);
+                mentions.push({ tag: userName, id: userFbId });
+                memLength.push(participantIDs.length - i++);
 
-			if (existsSync(path)) mkdirSync(path, { recursive: true });
+                if (!global.data.allUserID.includes(String(userFbId))) {
+                    await Users.createData(userFbId, { name: userName, data: {} });
+                    global.data.allUserID.push(String(userFbId));
+                }
+            }
 
-			if (existsSync(pathGif)) formPush = { body: msg, attachment: createReadStream(pathGif), mentions }
-			else formPush = { body: msg, mentions }
+            memLength.sort((a, b) => a - b);
 
-			return api.sendMessage(formPush, threadID);
-		} catch (e) { return console.log(e) };
-	}
-}
+            var msg = threadData.customJoin ||
+                "👋 Welcome {name}!\nWelcome to {threadName}.\n{type} is member #{memberCount} of this group 🥳";
+
+            msg = msg
+                .replace(/\{name}/g, nameArray.join(', '))
+                .replace(/\{type}/g, memLength.length > 1 ? 'they' : 'you')
+                .replace(/\{memberCount}/g, memLength.join(', '))
+                .replace(/\{soThanhVien}/g, memLength.join(', '))
+                .replace(/\{threadName}/g, threadName);
+
+            if (!fs.existsSync(cachePath)) fs.mkdirSync(cachePath, { recursive: true });
+
+            let formPush;
+            if (fs.existsSync(pathGif)) {
+                formPush = { body: msg, attachment: fs.createReadStream(pathGif), mentions };
+            } else {
+                formPush = { body: msg, mentions };
+            }
+
+            return api.sendMessage(formPush, threadID);
+        } catch (e) {
+            return console.log(e);
+        }
+    }
+};

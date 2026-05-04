@@ -1,41 +1,36 @@
-const axios = require("axios");
-const moment = require("moment-timezone");
-
 module.exports.config = {
-  name: "prefix",
-  version: "2.0.0",
-  hasPermission: 0,
-  credits: "DongDev",
-  description: "prefix bot",
-  commandCategory: "Hệ thống",
-  usages: "[]",
-  cooldowns: 0
+    name: "prefix",
+    version: "2.0.0",
+    hasPermssion: 0,
+    credits: "DongDev",
+    description: "Show or check the bot prefix",
+    commandCategory: "System",
+    usages: "[]",
+    cooldowns: 0
 };
 
-module.exports.handleEvent = async function ({ api, event, client }) {
-  const { threadID, body } = event;
-  if (!body) return;
+module.exports.handleEvent = async function ({ api, event }) {
+    const { threadID, body } = event;
+    if (!body) return;
 
-  const { PREFIX } = global.config;
-  const gio = moment.tz("Asia/Ho_Chi_Minh").format("HH:mm:ss || DD/MM/YYYY");
+    const { PREFIX } = global.config;
+    let threadSetting = global.data.threadData.get(threadID) || {};
+    let prefix = threadSetting.PREFIX || PREFIX;
 
-  let threadSetting = global.data.threadData.get(threadID) || {};
-  let prefix = threadSetting.PREFIX || PREFIX;
+    const lowerBody = body.toLowerCase().trim();
 
-  const lowerBody = body.toLowerCase();
-
-  if (
-    lowerBody === "prefix" ||
-    lowerBody === "prefix bot là gì" ||
-    lowerBody === "quên prefix r" ||
-    lowerBody === "dùng sao"
-  ) {
-    api.sendMessage(
-      `✏️ Prefix của nhóm: ${prefix}\n📎 Prefix hệ thống: ${PREFIX}`,
-      threadID,
-      event.messageID
-    );
-  }
+    if (
+        lowerBody === "prefix" ||
+        lowerBody === "what is the prefix" ||
+        lowerBody === "forgot prefix" ||
+        lowerBody === "how to use"
+    ) {
+        api.sendMessage(
+            `✏️ Group prefix: ${prefix}\n📎 System prefix: ${PREFIX}`,
+            threadID,
+            event.messageID
+        );
+    }
 };
 
 module.exports.run = async function () {};
