@@ -1,84 +1,93 @@
-const axios = require('axios');
 const fs = require('fs-extra');
 const path = require('path');
 const { exec } = require('child_process');
+const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
 const bold = require('../../utils/bold');
 
-const VERSION = "2.0.0";
+const VERSION = "3.0.0";
 const TEAM = "TEAM STARTCOPE BETA";
 const TEMP_DIR = path.join(process.cwd(), 'utils/data/jingle_temp');
 fs.ensureDirSync(TEMP_DIR);
 
-// Voice characters: name => { tl, speed, pitch }
+// ─── VOICE CHARACTERS ────────────────────────────────────────────────────────
 const VOICES = {
-  dj:     { tl: 'en',    speed: 1.05, pitch: 1.0,  label: '🎙️ DJ Announcer (English)'  },
-  female: { tl: 'en',    speed: 0.92, pitch: 1.0,  label: '👩 Female (English)'         },
-  male:   { tl: 'en',    speed: 0.95, pitch: 0.82, label: '👨 Male (Deep English)'      },
-  uk:     { tl: 'en-gb', speed: 0.95, pitch: 1.0,  label: '🇬🇧 British (English)'       },
-  fil:    { tl: 'fil',   speed: 0.90, pitch: 1.0,  label: '🇵🇭 Filipino (Tagalog)'      },
-  au:     { tl: 'en-au', speed: 0.95, pitch: 1.0,  label: '🦘 Australian (English)'    },
+  dj:      { voice: 'en-US-GuyNeural',                   opts: { rate: '+10%', pitch: '+0Hz'   }, label: '🎙️ DJ Announcer',      fx: null         },
+  male:    { voice: 'en-US-ChristopherNeural',            opts: { rate: '-5%',  pitch: '-20Hz'  }, label: '👨 Male (US)',          fx: null         },
+  female:  { voice: 'en-US-EmmaNeural',                   opts: { rate: '+0%',  pitch: '+0Hz'   }, label: '👩 Female (US)',        fx: null         },
+  aria:    { voice: 'en-US-AriaNeural',                   opts: { rate: '+0%',  pitch: '+0Hz'   }, label: '💃 Aria (US)',          fx: null         },
+  sexy:    { voice: 'en-US-JennyNeural',                  opts: { rate: '-15%', pitch: '-30Hz'  }, label: '🥰 Sexy / Smooth',     fx: null         },
+  grandpa: { voice: 'en-US-ChristopherNeural',            opts: { rate: '-28%', pitch: '-80Hz'  }, label: '👴 Grandpa',           fx: null         },
+  grandma: { voice: 'en-US-AriaNeural',                   opts: { rate: '-25%', pitch: '-50Hz'  }, label: '👵 Grandma',           fx: null         },
+  kid:     { voice: 'en-US-AnaNeural',                    opts: { rate: '+10%', pitch: '+60Hz'  }, label: '🧒 Kid',               fx: null         },
+  news:    { voice: 'en-US-SteffanNeural',                opts: { rate: '-5%',  pitch: '+0Hz'   }, label: '📰 News Anchor',       fx: null         },
+  uk:      { voice: 'en-GB-RyanNeural',                   opts: { rate: '-5%',  pitch: '+0Hz'   }, label: '🇬🇧 British Male',      fx: null         },
+  uklady:  { voice: 'en-GB-SoniaNeural',                  opts: { rate: '+0%',  pitch: '+0Hz'   }, label: '🇬🇧 British Female',    fx: null         },
+  au:      { voice: 'en-AU-WilliamMultilingualNeural',    opts: { rate: '+0%',  pitch: '+0Hz'   }, label: '🦘 Australian',        fx: null         },
+  fil:     { voice: 'fil-PH-AngeloNeural',                opts: { rate: '-5%',  pitch: '+0Hz'   }, label: '🇵🇭 Filipino Lalaki',   fx: null         },
+  filgirl: { voice: 'fil-PH-BlessicaNeural',              opts: { rate: '-5%',  pitch: '+0Hz'   }, label: '🇵🇭 Filipino Babae',    fx: null         },
+  indian:  { voice: 'en-IN-PrabhatNeural',                opts: { rate: '+0%',  pitch: '+0Hz'   }, label: '🇮🇳 Indian',           fx: null         },
+  robot:   { voice: 'en-US-GuyNeural',                    opts: { rate: '-5%',  pitch: '+0Hz'   }, label: '🤖 Robot',             fx: 'robot'      },
+  brian:   { voice: 'en-US-BrianNeural',                  opts: { rate: '+0%',  pitch: '+0Hz'   }, label: '🎤 Brian',             fx: null         },
+  roger:   { voice: 'en-US-RogerNeural',                  opts: { rate: '+5%',  pitch: '+0Hz'   }, label: '📻 Roger (Radio)',     fx: null         },
+  sg:      { voice: 'en-SG-WayneNeural',                  opts: { rate: '+0%',  pitch: '+0Hz'   }, label: '🇸🇬 Singaporean',      fx: null         },
 };
 const VOICE_KEYS = Object.keys(VOICES);
 
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
 function cleanup(...files) {
   setTimeout(() => files.forEach(f => fs.remove(f).catch(() => {})), 300000);
 }
 
 function run(cmd) {
   return new Promise((resolve, reject) => {
-    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err, stdout, stderr) => {
+    exec(cmd, { maxBuffer: 1024 * 1024 * 50 }, (err, _, stderr) => {
       if (err) reject(new Error(stderr?.slice(0, 300) || err.message));
       else resolve();
     });
   });
 }
 
-// Generate voice audio via Google TTS (free, no key)
-async function getVoiceAudio(text, tl, speed) {
-  const cleanText = text.replace(/[*_#\[\]()]/g, '').replace(/\n+/g, '. ').trim().slice(0, 200);
-  for (let i = 0; i < 3; i++) {
-    try {
-      const encoded = encodeURIComponent(cleanText);
-      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encoded}&tl=${tl}&client=tw-ob&ttsspeed=${speed}`;
-      const res = await axios.get(url, {
-        responseType: 'arraybuffer',
-        timeout: 30000,
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-      });
-      if (!res.data || res.data.byteLength < 100) throw new Error('Empty audio response');
-      const fp = path.join(TEMP_DIR, `voice_${Date.now()}.mp3`);
-      await fs.writeFile(fp, Buffer.from(res.data));
-      return fp;
-    } catch (e) {
-      if (i < 2) { await new Promise(r => setTimeout(r, (i + 1) * 2000)); continue; }
-      throw e;
-    }
-  }
+// ─── MICROSOFT NEURAL TTS (FREE) ──────────────────────────────────────────────
+async function generateVoice(text, voiceKey, outPath) {
+  const cfg = VOICES[voiceKey];
+  const tts = new MsEdgeTTS();
+  await tts.setMetadata(cfg.voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
+  const { audioStream } = tts.toStream(text, cfg.opts);
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    audioStream.on('data', d => chunks.push(d));
+    audioStream.on('end', async () => {
+      const buf = Buffer.concat(chunks);
+      if (buf.length < 100) return reject(new Error('Empty voice audio'));
+      await fs.writeFile(outPath, buf);
+      resolve();
+    });
+    audioStream.on('error', reject);
+  });
 }
 
-// Pitch-shift a voice file down for "male" deep voice effect
-async function pitchShift(inputPath, pitch, outPath) {
-  const rate = Math.round(44100 * pitch);
-  await run(`ffmpeg -y -i "${inputPath}" -filter_complex "asetrate=${rate},aresample=44100" -b:a 128k "${outPath}"`);
+// ─── ROBOT FX ─────────────────────────────────────────────────────────────────
+async function applyRobotFx(inputPath, outPath) {
+  await run(
+    `ffmpeg -y -i "${inputPath}" ` +
+    `-filter_complex "acrusher=level_in=4:level_out=4:bits=8:mode=log:aa=1,aecho=0.8:0.7:20|40:0.5|0.3" ` +
+    `-b:a 128k "${outPath}"`
+  );
 }
 
-// Generate a musical radio jingle riff (ascending C-E-G notes + full chord)
-// Uses aevalsrc with exponential decay for a "hit" sound
+// ─── BACKGROUND MUSIC ─────────────────────────────────────────────────────────
+// Ascending melody riff: C5 → E5 → G5 → C6 → G5, then full C major chord + echo/reverb
 async function generateJingleBg(padDuration, outPath) {
   const cmd = [
     'ffmpeg -y',
-    // Note 1: C5 (523 Hz) — short hit
-    '-f lavfi -i "aevalsrc=0.55*sin(2*PI*523*t)*exp(-t*4):s=44100:d=0.35"',
-    // Note 2: E5 (659 Hz) — short hit
-    '-f lavfi -i "aevalsrc=0.55*sin(2*PI*659*t)*exp(-t*4):s=44100:d=0.35"',
-    // Note 3: G5 (784 Hz) — short hit
-    '-f lavfi -i "aevalsrc=0.55*sin(2*PI*784*t)*exp(-t*4):s=44100:d=0.35"',
-    // Final chord: C5+E5+G5+C6 — full rich chord with slow decay
-    '-f lavfi -i "aevalsrc=(0.35*sin(2*PI*523*t)+0.30*sin(2*PI*659*t)+0.25*sin(2*PI*784*t)+0.20*sin(2*PI*1047*t))*exp(-t*0.55):s=44100:d=3.5"',
-    // Silence pad at end
-    '-f lavfi -i "aevalsrc=0:s=44100:d=' + padDuration + '"',
-    // Concat the 3 notes + chord, then pad with silence
-    '-filter_complex "[0][1][2][3]concat=n=4:v=0:a=1[riff];[riff][4:a]concat=n=2:v=0:a=1[padded];[padded]volume=1.0[out]"',
+    '-f lavfi -i "aevalsrc=0.6*sin(2*PI*523*t)*exp(-t*5):s=44100:d=0.28"',   // C5
+    '-f lavfi -i "aevalsrc=0.6*sin(2*PI*659*t)*exp(-t*5):s=44100:d=0.28"',   // E5
+    '-f lavfi -i "aevalsrc=0.6*sin(2*PI*784*t)*exp(-t*5):s=44100:d=0.28"',   // G5
+    '-f lavfi -i "aevalsrc=0.6*sin(2*PI*1047*t)*exp(-t*5):s=44100:d=0.28"',  // C6
+    '-f lavfi -i "aevalsrc=0.5*sin(2*PI*784*t)*exp(-t*5):s=44100:d=0.22"',   // G5 (return)
+    '-f lavfi -i "aevalsrc=(0.30*sin(2*PI*523*t)+0.28*sin(2*PI*659*t)+0.24*sin(2*PI*784*t)+0.20*sin(2*PI*1047*t)+0.14*sin(2*PI*1319*t))*exp(-t*0.42):s=44100:d=4.5"', // full chord
+    `-f lavfi -i "aevalsrc=0:s=44100:d=${padDuration}"`,                      // silence pad
+    '-filter_complex "[0][1][2][3][4][5]concat=n=6:v=0:a=1[melody];[melody]aecho=0.8:0.6:80|160:0.4|0.2[echoed];[echoed][6:a]concat=n=2:v=0:a=1[padded];[padded]volume=0.85[out]"',
     '-map "[out]"',
     '-ar 44100 -ac 2 -b:a 128k',
     `"${outPath}"`
@@ -86,176 +95,147 @@ async function generateJingleBg(padDuration, outPath) {
   await run(cmd);
 }
 
-// Mix voice (foreground) + background jingle music
+// ─── MIX VOICE + BACKGROUND ───────────────────────────────────────────────────
 async function mixAudio(voicePath, bgPath, outPath) {
-  const cmd = [
+  await run([
     'ffmpeg -y',
     `-i "${voicePath}"`,
     `-i "${bgPath}"`,
-    '-filter_complex "[0:a]volume=1.8,afade=t=in:st=0:d=0.15[v];[1:a]volume=0.40[b];[v][b]amix=inputs=2:duration=first[out]"',
+    '-filter_complex "[0:a]volume=2.0,afade=t=in:st=0:d=0.15[v];[1:a]volume=0.38[b];[v][b]amix=inputs=2:duration=first[out]"',
     '-map "[out]"',
     '-ar 44100 -ac 2 -b:a 128k',
     `"${outPath}"`
-  ].join(' ');
-  await run(cmd);
+  ].join(' '));
 }
 
-// Generate a catchy jingle script via free AI (pollinations.ai)
-async function generateJingleScript(stationName, voiceChar) {
-  const isFil = voiceChar === 'fil';
-  const langNote = isFil
-    ? 'Write the jingle in Filipino/Tagalog. Make it catchy and local sounding.'
-    : 'Write the jingle in English. Make it energetic and professional.';
-  const prompt = `You are a professional radio station jingle copywriter.
-Write a SHORT, catchy radio station ID/jingle script (2-3 sentences, max 45 words) for: "${stationName}".
-${langNote}
-Sound like a real FM radio announcer — hype, punchy, memorable.
-Output only the jingle script text, nothing else.`;
-
-  for (let i = 0; i < 3; i++) {
-    try {
-      const res = await axios.post('https://text.pollinations.ai/', {
-        messages: [
-          { role: 'system', content: 'You write short punchy radio jingle scripts. Max 45 words. No labels.' },
-          { role: 'user', content: prompt }
-        ],
-        model: 'openai', temperature: 0.92
-      }, { headers: { 'Content-Type': 'application/json' }, timeout: 30000 });
-      const text = typeof res.data === 'string' ? res.data
-        : res.data?.choices?.[0]?.message?.content || res.data?.text || String(res.data);
-      if (text && text.length > 5) return text.trim().slice(0, 220);
-    } catch (e) {
-      if (i < 2) { await new Promise(r => setTimeout(r, (i + 1) * 2000)); continue; }
-    }
-  }
-  // Fallback script if AI fails
-  return isFil
-    ? `${stationName}! Ang pinakamagandang istasyon para sa pinakamahusay na musika! Makinig at mag-enjoy!`
-    : `${stationName}! Your number one station for the hottest hits! Sit back, relax, and enjoy the ride!`;
+// ─── HELP TEXT ────────────────────────────────────────────────────────────────
+function buildHelp(prefix) {
+  const col1 = VOICE_KEYS.slice(0, 10).map(k => `  ${bold(k.padEnd(8))} ${VOICES[k].label}`).join('\n');
+  const col2 = VOICE_KEYS.slice(10).map(k  => `  ${bold(k.padEnd(8))} ${VOICES[k].label}`).join('\n');
+  return (
+    `╔═══════════════════════════════════╗\n` +
+    `║  📻 ${bold('RADIO JINGLE v' + VERSION)}           ║\n` +
+    `║  🏷️  ${bold(TEAM)}       ║\n` +
+    `╚═══════════════════════════════════╝\n\n` +
+    `🎙️ ${bold('Microsoft Neural TTS — FREE!')}\n` +
+    `🎵 ${bold('Real musical background + echo!')}\n\n` +
+    `📋 ${bold('PAANO GAMITIN:')}\n${'─'.repeat(35)}\n` +
+    `${prefix}jingle [text]\n` +
+    `${prefix}jingle [voice] [text]\n\n` +
+    `🎤 ${bold('LAHAT NG VOICE CHARACTERS:')}\n${'─'.repeat(35)}\n` +
+    col1 + '\n' + col2 + '\n\n' +
+    `${'─'.repeat(35)}\n` +
+    `📌 ${bold('HALIMBAWA:')}\n` +
+    `• ${prefix}jingle 96.9 Easy Rock Manila your number one station!\n` +
+    `• ${prefix}jingle grandpa Welcome to 96.9 Easy Rock!\n` +
+    `• ${prefix}jingle grandma Good morning listeners!\n` +
+    `• ${prefix}jingle robot Initializing broadcast sequence!\n` +
+    `• ${prefix}jingle fil Magandang umaga sa lahat!\n` +
+    `• ${prefix}jingle kid This is my favorite radio station!\n` +
+    `• ${prefix}jingle uk This is 96.9 Easy Rock Manila!\n\n` +
+    `✅ ${bold('YOU write the script — real human prompt!')}\n` +
+    `📥 ${bold('Pwedeng i-download ang audio!')}`
+  );
 }
 
+// ─── COMMAND ──────────────────────────────────────────────────────────────────
 module.exports.config = {
   name: 'jingle',
   version: VERSION,
   hasPermssion: 0,
   credits: TEAM,
-  description: 'Generate a real radio station voice jingle with background music — FREE, multiple character voices!',
+  description: 'Generate a real radio jingle with your own script — 20 character voices + musical background (FREE)',
   commandCategory: 'Entertainment',
-  usages: '[voice?] [radio station name]',
+  usages: '[voice?] [your jingle text]',
   cooldowns: 15
 };
 
 module.exports.run = async function ({ api, event, args }) {
   const { threadID, messageID } = event;
-  const P = global.config.PREFIX;
+  const P = global.config?.PREFIX || '!';
 
   if (!args.length) {
-    const voiceList = VOICE_KEYS.map(k => `  • ${bold(k.padEnd(6))} — ${VOICES[k].label}`).join('\n');
-    return api.sendMessage(
-      `╔══════════════════════════════╗\n` +
-      `║  📻 ${bold('RADIO JINGLE')} ${bold('v' + VERSION)}       ║\n` +
-      `║  🏷️  ${bold(TEAM)}    ║\n` +
-      `╚══════════════════════════════╝\n\n` +
-      `🎙️ ${bold('Libre — Voice + Background Music!')}\n\n` +
-      `📋 ${bold('PAANO GAMITIN:')}\n${'─'.repeat(30)}\n\n` +
-      `📻 ${P}jingle [station name]\n` +
-      `📻 ${P}jingle [voice] [station name]\n\n` +
-      `🎤 ${bold('MGA VOICE CHARACTERS:')}\n${voiceList}\n\n` +
-      `${'─'.repeat(30)}\n` +
-      `📌 ${bold('HALIMBAWA:')}\n` +
-      `• ${P}jingle 96.9 Easy Rock Manila\n` +
-      `• ${P}jingle dj 96.9 Easy Rock Manila\n` +
-      `• ${P}jingle male 101.1 Yes The Best\n` +
-      `• ${P}jingle fil 97.9 Home Radio\n` +
-      `• ${P}jingle uk DWRR 101.9\n\n` +
-      `🎵 ${bold('May background music + real voice!')} 📻`,
-      threadID, messageID
-    );
+    return api.sendMessage(buildHelp(P), threadID, messageID);
   }
 
   // Detect optional voice character prefix
   let voiceKey = 'dj';
-  let stationArgs = args;
+  let scriptArgs = args;
   if (VOICE_KEYS.includes(args[0]?.toLowerCase())) {
     voiceKey = args[0].toLowerCase();
-    stationArgs = args.slice(1);
+    scriptArgs = args.slice(1);
   }
 
-  if (!stationArgs.length) {
+  if (!scriptArgs.length) {
     return api.sendMessage(
-      `❌ Lagyan ng station name!\n💡 Halimbawa: ${P}jingle ${voiceKey} 96.9 Easy Rock Manila`,
+      `❌ Lagyan ng jingle text!\n` +
+      `💡 Halimbawa: ${P}jingle ${voiceKey} 96.9 Easy Rock Manila your number one station!`,
       threadID, messageID
     );
   }
 
-  const stationName = stationArgs.join(' ').trim();
-  const voice = VOICES[voiceKey];
+  const jingleText = scriptArgs.join(' ').trim();
+  const vcfg = VOICES[voiceKey];
 
   api.setMessageReaction('📻', messageID, () => {}, true);
   api.sendMessage(
     `⏳ ${bold('Ginagawa ang iyong radio jingle...')}\n` +
-    `📻 ${bold('Station:')} ${stationName}\n` +
-    `🎤 ${bold('Voice:')} ${voice.label}\n` +
-    `🎵 Generating script + voice + background music...\n` +
-    `⚡ ${bold('Please wait (15–25 seconds)...')}`,
+    `🎤 ${bold('Voice:')} ${vcfg.label}\n` +
+    `📝 ${bold('Script:')} "${jingleText.slice(0, 80)}${jingleText.length > 80 ? '...' : ''}"\n` +
+    `🎵 Generating voice + background music...\n` +
+    `⚡ ${bold('Please wait (10–20 seconds)...')}`,
     threadID
   );
 
   const ts = Date.now();
-  const rawVoicePath  = path.join(TEMP_DIR, `rv_${ts}.mp3`);
-  const voicePath     = path.join(TEMP_DIR, `v_${ts}.mp3`);
-  const bgPath        = path.join(TEMP_DIR, `bg_${ts}.mp3`);
-  const outputPath    = path.join(TEMP_DIR, `out_${ts}.mp3`);
+  const voiceRaw  = path.join(TEMP_DIR, `vr_${ts}.mp3`);
+  const voiceFx   = path.join(TEMP_DIR, `vf_${ts}.mp3`);
+  const bgPath    = path.join(TEMP_DIR, `bg_${ts}.mp3`);
+  const outputPath = path.join(TEMP_DIR, `out_${ts}.mp3`);
 
   try {
-    // Step 1: Generate jingle script with AI
-    const script = await generateJingleScript(stationName, voiceKey);
+    // Step 1: Generate Microsoft Neural TTS voice
+    await generateVoice(jingleText, voiceKey, voiceRaw);
 
-    // Step 2: Generate voice (Google TTS, free)
-    const tmpVoice = await getVoiceAudio(script, voice.tl, voice.speed);
-
-    // Step 3: Apply pitch shift for male deep voice (or just rename for others)
-    if (voice.pitch !== 1.0) {
-      await pitchShift(tmpVoice, voice.pitch, voicePath);
-      await fs.remove(tmpVoice);
-    } else {
-      await fs.move(tmpVoice, voicePath, { overwrite: true });
+    // Step 2: Apply special FX if needed (robot)
+    let finalVoicePath = voiceRaw;
+    if (vcfg.fx === 'robot') {
+      await applyRobotFx(voiceRaw, voiceFx);
+      finalVoicePath = voiceFx;
     }
 
-    // Step 4: Generate musical jingle background
-    // Pad duration = voice duration estimate (generous)
-    await generateJingleBg(12, bgPath);
+    // Step 3: Generate musical jingle background
+    await generateJingleBg(14, bgPath);
 
-    // Step 5: Mix voice + background
-    await mixAudio(voicePath, bgPath, outputPath);
+    // Step 4: Mix voice + background music
+    await mixAudio(finalVoicePath, bgPath, outputPath);
 
     // Cleanup intermediates
-    cleanup(voicePath, bgPath);
+    cleanup(voiceRaw, voiceFx, bgPath);
 
     api.setMessageReaction('✅', messageID, () => {}, true);
 
-    // Send jingle script info first
+    // Send info card first
     await api.sendMessage(
-      `📻 ${bold('RADIO JINGLE')} — ${bold('Ready!')}\n` +
+      `📻 ${bold('RADIO JINGLE — Ready!')}\n` +
       `🏷️ ${bold(TEAM)}\n` +
-      `${'─'.repeat(30)}\n` +
-      `🎙️ ${bold('Station:')} ${stationName}\n` +
-      `🎤 ${bold('Voice:')} ${voice.label}\n` +
-      `${'─'.repeat(30)}\n` +
-      `📝 ${bold('Jingle Script:')}\n"${script}"\n` +
-      `${'─'.repeat(30)}\n` +
-      `🔊 ${bold('Sending jingle audio...')} 👇`,
+      `${'─'.repeat(32)}\n` +
+      `🎤 ${bold('Voice:')} ${vcfg.label}\n` +
+      `📝 ${bold('Script:')}\n"${jingleText}"\n` +
+      `${'─'.repeat(32)}\n` +
+      `🔊 ${bold('Sending audio...')} 👇\n` +
+      `📥 ${bold('Pwedeng i-download!')}`,
       threadID
     );
 
-    // Send the jingle audio file
+    // Send the downloadable jingle audio
     return api.sendMessage({
-      body: `🎙️ ${bold('RADIO JINGLE')} — ${bold(stationName)}\n🎤 ${voice.label}\n🏷️ ${bold(TEAM)}`,
+      body: `🎙️ ${bold('RADIO JINGLE')} 📻\n🎤 ${vcfg.label}\n🏷️ ${bold(TEAM)}\n📥 Hold & save to download!`,
       attachment: fs.createReadStream(outputPath)
     }, threadID, () => cleanup(outputPath));
 
   } catch (e) {
-    cleanup(rawVoicePath, voicePath, bgPath, outputPath);
+    cleanup(voiceRaw, voiceFx, bgPath, outputPath);
     api.setMessageReaction('❌', messageID, () => {}, true);
     console.error('[Jingle Error]', e.message);
     return api.sendMessage(
