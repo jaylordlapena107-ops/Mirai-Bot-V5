@@ -1,6 +1,10 @@
 node_modules/
 package-lock.json
 cookie.txt
+appstate.json
+utils/data/
 utils/data/fbstate.json
 includes/data.sqlite
-*.txt
+Fca_Database/database.sqlite
+*.sqlite
+.env

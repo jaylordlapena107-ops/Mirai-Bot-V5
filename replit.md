@@ -1,46 +1,54 @@
 # Mirai Bot V3 Unofficial
 
-## Overview
-A Facebook Messenger chatbot built with Node.js. It connects to Facebook via cookies/credentials and listens for messages, responding to commands and events.
+A Facebook Messenger chatbot built with Node.js that listens for messages and responds to commands and events via the Facebook Chat API.
 
-## Architecture
-- **Runtime**: Node.js 20
-- **Entry point**: `index.js` (spawns `mirai.js` with auto-restart)
-- **Database**: SQLite via Sequelize (`Fca_Database/database.sqlite`)
-- **Facebook API**: `@dongdev/fca-unofficial`
+## Run & Operate
+- **Start**: `node index.js`
+- **npm script**: `npm start`
+- **Required credentials**: `appstate.json` (Facebook app state array) OR `cookie.txt` (Facebook cookies) must be present in the project root before the bot can log in.
 
-## Project Structure
-- `index.js` - Entry point with auto-restart logic
-- `mirai.js` - Main bot logic, connects to Facebook, loads modules
-- `config.json` - Bot configuration (credentials, prefix, admin settings)
-- `fca-config.json` - Facebook API config (MQTT settings)
-- `modules/commands/` - Bot commands (help, ping, admin, etc.)
-- `modules/events/` - Event handlers (join, leave notifications)
-- `includes/` - Core includes: database, controllers, event handlers
-- `languages/` - Language files (`en.lang`, `vi.lang`)
-- `utils/` - Utility functions and logging
+## Stack
+- Runtime: Node.js 20
+- Facebook API: `stfca` + `@dongdev/fca-unofficial`
+- Database: SQLite via Sequelize (file: `Fca_Database/database.sqlite` / `includes/data.sqlite`)
+- Image processing: `canvas`, `jimp`
+- Scheduling: `node-cron`
 
-## Setup Requirements
-The bot requires a `cookie.txt` file in the project root containing the Facebook account cookies for the bot account.
+## Where things live
+- `index.js` — entry point, auto-restarts `mirai.js` on crash
+- `mirai.js` — main bot logic: login, load modules, connect MQTT
+- `config.json` — bot settings (prefix, admin IDs, feature flags)
+- `fca-config.json` — Facebook API MQTT options
+- `modules/commands/` — bot commands (help, ping, admin, etc.)
+- `modules/events/` — event handlers (join/leave notifications)
+- `includes/` — database setup, controllers, event/command handlers
+- `languages/` — `en.lang`, `vi.lang`
+- `utils/` — logging, utilities, runtime data
 
-## Configuration
-Edit `config.json` to set:
-- `EMAIL` / `PASSWORD` / `OTPKEY` - Facebook credentials
-- `FACEBOOK_ADMIN` - Admin Facebook ID
-- `BOTNAME` - Bot display name
-- `PREFIX` - Command prefix (default: `!`)
-- `ADMINBOT` - Array of admin user IDs
-- `language` - Bot language (`en` or `vi`)
+## Architecture decisions
+- `index.js` wraps `mirai.js` in a child process with up to 5 auto-restarts on crash
+- Login supports both `appstate.json` (preferred) and `cookie.txt` (fallback)
+- SQLite is used for user/thread/currency persistence — no external DB required
+- Commands and events are dynamically loaded from `modules/` at startup
+- Modules declare `config.envConfig` to inject per-module config into `global.config`
 
-## Running
-```bash
-node index.js
-```
+## Product
+- Responds to commands with a configurable prefix (default: `!`)
+- Handles Facebook group events (join/leave notifications)
+- Per-thread settings (prefix, banned commands, NSFW flag)
+- Economy system (currencies), user/thread banning, admin controls
+- Scheduled tasks via `node-cron`
 
-## Dependencies
-All npm dependencies are listed in `package.json`. Key ones:
-- `@dongdev/fca-unofficial` - Facebook Chat API
-- `sequelize` + `sqlite3` - Database ORM
-- `canvas`, `jimp` - Image processing
-- `moment-timezone` - Time handling
-- `node-cron` - Scheduled tasks
+## User preferences
+- Deployment targets: Render.com (recommended), Netlify, Vercel
+- `render.yaml`, `netlify.toml`, `vercel.json` config files are present
+
+## Gotchas
+- Bot will exit immediately if neither `appstate.json` nor `cookie.txt` is present
+- `appstate.json` must be a valid JSON array (not a placeholder string)
+- Render.com Worker is the best fit — Netlify/Vercel are serverless and not ideal for a persistent MQTT connection
+- `appstate.json` and `cookie.txt` are in `.gitignore` — never commit credentials
+
+## Pointers
+- Deployment configs: `render.yaml`, `netlify.toml`, `vercel.json`
+- Language files: `languages/en.lang`, `languages/vi.lang`

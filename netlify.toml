@@ -1,0 +1,11 @@
+[build]
+  command = "npm install"
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
+
+# Note: Netlify is designed for static sites and serverless functions.
+# This bot is a long-running Node.js process and is best hosted on
+# Render.com (as a Worker) or a similar platform that supports persistent processes.
+# Netlify is included here for completeness — use Render.com for full functionality.
