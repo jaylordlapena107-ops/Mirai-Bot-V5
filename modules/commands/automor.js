@@ -164,40 +164,58 @@ const DIVIDERS = [
 ];
 
 function composeNewsPost(news, isVideo = false) {
+  // Plain text only — Facebook Wall does NOT render unicode bold/markdown
+  // All bold() and box-drawing chars removed deliberately
   const now = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' });
-  const div = pick(DIVIDERS);
 
   const layouts = [
     () =>
-      `${news.emoji} ${bold('[' + news.cat.toUpperCase() + '] ' + news.source)} 🇵🇭\n${div}\n\n` +
-      `${bold(news.title)}\n\n` +
+      `${news.emoji} [${news.cat.toUpperCase()}] ${news.source} 🇵🇭\n` +
+      `${'─'.repeat(30)}\n\n` +
+      `${news.title}\n\n` +
       (news.desc ? `${news.desc}\n\n` : '') +
       `📅 ${now} PH\n` +
-      (news.link ? `🔗 ${news.link}\n` : '') +
-      (isVideo ? `\n🎬 ${bold('May kasamang VIDEO NEWS!')}\n` : '') +
-      `${div}\n🏷️ ${bold(TEAM)} | MOR Naga News 🇵🇭`,
+      (isVideo ? `🎬 May kasamang VIDEO NEWS!\n` : '') +
+      `${'─'.repeat(30)}\n` +
+      `${TEAM} | MOR Naga News 🇵🇭`,
 
     () =>
-      `╔══ 📡 ${bold('PHILIPPINE NEWS')} ══╗\n\n` +
-      `${news.emoji} ${bold(news.cat.toUpperCase())} — ${bold(news.source)}\n\n` +
-      `${bold(news.title)}\n\n` +
+      `📡 PHILIPPINE NEWS\n\n` +
+      `${news.emoji} ${news.cat.toUpperCase()} — ${news.source}\n\n` +
+      `${news.title}\n\n` +
       (news.desc ? `${news.desc}\n\n` : '') +
       `📅 ${now} PH\n` +
-      (news.link ? `🌐 ${news.link}\n` : '') +
-      `\n╚═════════════════════════╝\n` +
-      `🏷️ ${bold(TEAM)} #PhilippinesNews`,
+      `${TEAM} #PhilippinesNews`,
 
     () =>
-      `🔴 ${bold('LIVE NEWS UPDATE')} — ${bold('PHILIPPINES')}\n${div}\n\n` +
-      `${news.emoji} ${bold(news.title)}\n\n` +
+      `🔴 LIVE NEWS UPDATE — PHILIPPINES\n` +
+      `${'─'.repeat(30)}\n\n` +
+      `${news.emoji} ${news.title}\n\n` +
       (news.desc ? `${news.desc}\n\n` : '') +
-      `📌 ${bold('Source:')} ${news.source}\n` +
-      `📅 ${bold('Time:')} ${now} PH\n` +
-      (news.link ? `🔗 ${news.link}\n` : '') +
-      `${div}\n🇵🇭 ${bold(TEAM)}`,
+      `Source: ${news.source}\n` +
+      `Time: ${now} PH\n` +
+      `🇵🇭 ${TEAM}`,
   ];
 
   return pick(layouts)().trim().slice(0, 1900);
+}
+
+// ── Generate news image via Pollinations (fallback when no thumbnail) ─────────
+async function generateNewsImage(title) {
+  try {
+    const prompt = encodeURIComponent(
+      `Philippine news broadcast graphic, bold headline text: "${title.slice(0, 60)}", ` +
+      `dark navy blue background, red breaking news banner at bottom, ` +
+      `professional TV news style, Philippines flag accent, ` +
+      `sharp crisp legible white text, high contrast, ultra HD, no blur`
+    );
+    const url = `https://image.pollinations.ai/prompt/${prompt}?width=1080&height=600&nologo=true&model=flux&seed=${Math.floor(Math.random() * 99999)}`;
+    const res  = await axios.get(url, { responseType: 'arraybuffer', timeout: 60000 });
+    if (!res.data || res.data.byteLength < 2000) return null;
+    const fp = path.join(TEMP_DIR, `news_img_${Date.now()}.jpg`);
+    fs.writeFileSync(fp, Buffer.from(res.data));
+    return fp;
+  } catch { return null; }
 }
 
 // ── createPost wrapper ────────────────────────────────────────────────────────
@@ -296,15 +314,34 @@ async function runNewsCycle() {
       markSeen(newsId);
       const text = composeNewsPost(news);
 
+      // Try article thumbnail first, then generate via AI, then text-only
+      let imgPath = null;
       if (news.thumb && news.thumb.startsWith('http')) {
         try {
-          const imgPath = path.join(TEMP_DIR, `thumb_${Date.now()}.jpg`);
-          const imgRes  = await axios.get(news.thumb, { responseType: 'arraybuffer', timeout: 8000, headers: { 'User-Agent': UA } });
-          fs.writeFileSync(imgPath, imgRes.data);
+          imgPath = path.join(TEMP_DIR, `thumb_${Date.now()}.jpg`);
+          const imgRes = await axios.get(news.thumb, { responseType: 'arraybuffer', timeout: 10000, headers: { 'User-Agent': UA } });
+          if (imgRes.data && imgRes.data.byteLength > 2000) {
+            fs.writeFileSync(imgPath, imgRes.data);
+          } else {
+            imgPath = null;
+          }
+        } catch { imgPath = null; }
+      }
+
+      // No thumbnail — generate news image via Pollinations AI
+      if (!imgPath) {
+        console.log('[AutoMOR:News] No thumbnail — generating AI image...');
+        imgPath = await generateNewsImage(news.title);
+      }
+
+      if (imgPath) {
+        try {
           await doCreatePost(globalApi, text, fs.createReadStream(imgPath));
-          setTimeout(() => { try { fs.removeSync(imgPath); } catch {} }, 60000);
+          setTimeout(() => { try { fs.removeSync(imgPath); } catch {} }, 120000);
         } catch {
+          // Image post failed — fall back to text only
           await doCreatePost(globalApi, text);
+          try { fs.removeSync(imgPath); } catch {}
         }
       } else {
         await doCreatePost(globalApi, text);

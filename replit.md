@@ -28,17 +28,19 @@ A Facebook Messenger chatbot built with Node.js that listens for messages and re
 - `languages/` — `en.lang`, `vi.lang`
 - `utils/` — logging, utilities, runtime data
 
-## Commands (44 total)
+## Commands (46 total)
 | Command | Description |
 |---|---|
 | `!eval` / `!exec` | Owner: Execute JavaScript code live |
 | `!countdown [sec] [label]` | Live countdown timer with progress bar |
-| `!imgsearch [query]` | Free image search via DuckDuckGo, sends image |
+| `!imgsearch [query] [-n]` | Free image search via DuckDuckGo, sends image(s) |
 | `!canva news [title]` | Generate STARTCOPE NEWS image (AI-designed, free) |
 | `!canva design [prompt]` | Generate custom AI design poster |
 | `!canva logo [text]` | Generate professional logo with star icon |
+| `!pdf school/enrollment/clearance/permit/letter [name]` | Generate printable PDF form, send as file |
+| `!autofriend on/off/pending` | Admin: auto-accept all Facebook friend requests |
 | `!autopost on/off` | Admin: auto-post every 51 min to GC, 24/7 |
-| `!automor on/off` | Admin: dual-cycle — news every 10min + video every 4min |
+| `!automor on/off` | Admin: dual-cycle — news+image every 10min, video every 4min |
 | `!broadcast` | Event: auto Jesus messages to all GCs every ~1 hour |
 | `!radio [station/freq]` | Search PH radio stations → streams live 30-sec clip |
 | `!spotify [song]` | Search SoundCloud → sends MP3 audio |

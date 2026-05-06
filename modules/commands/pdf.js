@@ -1,0 +1,454 @@
+/**
+ * !pdf — Generate printable PDF files (school application, forms, etc.)
+ * Uses pdfkit (pure JS, no external API, completely free)
+ * TEAM STARTCOPE BETA
+ *
+ * Usage:
+ *   !pdf school [student name]    — School application form
+ *   !pdf letter [name] [subject]  — Formal letter
+ *   !pdf clearance [name]         — School clearance form
+ *   !pdf permit [name]            — Exam permit
+ *   !pdf enrollment [name]        — Enrollment form
+ */
+
+const PDFDocument = require('pdfkit');
+const fs          = require('fs-extra');
+const path        = require('path');
+const bold        = require('../../utils/bold');
+
+const TEAM     = 'TEAM STARTCOPE BETA';
+const TEMP_DIR = path.join(process.cwd(), 'utils/data/pdf_temp');
+fs.ensureDirSync(TEMP_DIR);
+
+function cleanup(fp) { setTimeout(() => fs.remove(fp).catch(() => {}), 300000); }
+
+// ── PDF builder helpers ───────────────────────────────────────────────────────
+function createDoc() {
+  return new PDFDocument({ size: 'LETTER', margins: { top: 60, bottom: 60, left: 72, right: 72 } });
+}
+
+function line(doc, y, x1 = 72, x2 = 540) {
+  doc.moveTo(x1, y).lineTo(x2, y).stroke();
+}
+
+function field(doc, label, yPos, lineWidth = 350) {
+  doc.fontSize(9).fillColor('#555').text(label, 72, yPos);
+  line(doc, yPos + 14, 72, 72 + lineWidth);
+  return yPos + 28;
+}
+
+function twoFields(doc, label1, label2, yPos) {
+  doc.fontSize(9).fillColor('#555').text(label1, 72, yPos);
+  line(doc, yPos + 14, 72, 290);
+  doc.fontSize(9).text(label2, 310, yPos);
+  line(doc, yPos + 14, 310, 540);
+  return yPos + 28;
+}
+
+function sectionHeader(doc, text, yPos) {
+  doc.rect(72, yPos, 468, 18).fill('#003366');
+  doc.fontSize(10).fillColor('white').font('Helvetica-Bold').text(text, 76, yPos + 4);
+  doc.fillColor('black').font('Helvetica');
+  return yPos + 26;
+}
+
+// ── SCHOOL APPLICATION FORM ───────────────────────────────────────────────────
+function generateSchoolApplication(studentName = '') {
+  const fp  = path.join(TEMP_DIR, `school_app_${Date.now()}.pdf`);
+  const doc = createDoc();
+  const out = fs.createWriteStream(fp);
+  doc.pipe(out);
+
+  // Header
+  doc.fontSize(14).font('Helvetica-Bold').fillColor('#003366')
+     .text('REPUBLIC OF THE PHILIPPINES', { align: 'center' });
+  doc.fontSize(11).fillColor('#003366')
+     .text('DEPARTMENT OF EDUCATION', { align: 'center' });
+  doc.moveDown(0.3);
+  doc.fontSize(16).font('Helvetica-Bold').fillColor('#c00000')
+     .text('SCHOOL APPLICATION FORM', { align: 'center' });
+  doc.fontSize(10).font('Helvetica').fillColor('#003366')
+     .text('For School Year: _____________________', { align: 'center' });
+
+  line(doc, doc.y + 8);
+  doc.moveDown(0.8);
+
+  let y = doc.y;
+
+  // Section 1 — Personal Info
+  y = sectionHeader(doc, 'I. PERSONAL INFORMATION', y);
+  y = field(doc, 'Last Name:', y, 440);
+  y = field(doc, 'First Name:', y, 440);
+  y = field(doc, 'Middle Name:', y, 440);
+  y = twoFields(doc, 'Date of Birth (MM/DD/YYYY):', 'Place of Birth:', y);
+  y = twoFields(doc, 'Age:', 'Sex:   ☐ Male   ☐ Female', y);
+  y = twoFields(doc, 'Nationality:', 'Religion:', y);
+  y = field(doc, 'Complete Home Address:', y, 440);
+  y = twoFields(doc, 'Contact Number:', 'Email Address:', y);
+
+  y += 6;
+  y = sectionHeader(doc, 'II. GRADE / YEAR LEVEL APPLYING FOR', y);
+  y = twoFields(doc, 'Grade/Year Level:', 'Track/Strand (for SHS):', y);
+  y = twoFields(doc, 'School Last Attended:', 'School Year Completed:', y);
+  y = twoFields(doc, 'General Average:', 'LRN (Learner Reference No.):', y);
+
+  y += 6;
+  y = sectionHeader(doc, 'III. FAMILY BACKGROUND', y);
+  y = field(doc, "Father's Name:", y, 440);
+  y = twoFields(doc, "Father's Occupation:", "Contact Number:", y);
+  y = field(doc, "Mother's Name:", y, 440);
+  y = twoFields(doc, "Mother's Occupation:", "Contact Number:", y);
+  y = twoFields(doc, 'Guardian (if different):', "Relationship:", y);
+
+  y += 6;
+  y = sectionHeader(doc, 'IV. REQUIREMENTS CHECKLIST', y);
+
+  const reqs = [
+    '☐  Form 137 / SF10 (Permanent Record)',
+    '☐  Form 138 / Report Card (Latest)',
+    '☐  PSA Birth Certificate',
+    '☐  2x2 ID Picture (2 pcs)',
+    '☐  Good Moral Certificate',
+    '☐  Barangay Clearance',
+  ];
+  reqs.forEach(r => {
+    doc.fontSize(10).fillColor('black').font('Helvetica').text(r, 80, y);
+    y += 16;
+  });
+
+  y += 8;
+  // Certification
+  doc.fontSize(9).fillColor('#333').font('Helvetica-Oblique')
+     .text('I hereby certify that all information provided above is true and correct.', 72, y);
+  y += 22;
+
+  // Signatures
+  doc.font('Helvetica');
+  line(doc, y + 30, 72, 250);
+  line(doc, y + 30, 300, 540);
+  doc.fontSize(9).fillColor('#555')
+     .text("Applicant's Signature", 72, y + 33)
+     .text('Date Signed', 300, y + 33);
+
+  y += 60;
+  line(doc, y + 30, 72, 250);
+  line(doc, y + 30, 300, 540);
+  doc.fontSize(9).text("Parent/Guardian's Signature", 72, y + 33)
+     .text("School Registrar's Signature", 300, y + 33);
+
+  // Footer
+  doc.fontSize(8).fillColor('#888')
+     .text(`Generated by ${TEAM} via Mirai Bot V3 | ${new Date().toLocaleDateString('en-PH')}`, 72, 730, { align: 'center', width: 468 });
+
+  doc.end();
+  return new Promise((resolve, reject) => {
+    out.on('finish', () => resolve(fp));
+    out.on('error', reject);
+  });
+}
+
+// ── FORMAL LETTER ─────────────────────────────────────────────────────────────
+function generateFormalLetter(name = 'Student', subject = 'Request Letter') {
+  const fp  = path.join(TEMP_DIR, `letter_${Date.now()}.pdf`);
+  const doc = createDoc();
+  const out = fs.createWriteStream(fp);
+  doc.pipe(out);
+
+  const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  doc.fontSize(10).font('Helvetica').fillColor('black');
+  doc.text(today, { align: 'right' });
+  doc.moveDown();
+  doc.text('The Principal / School Head');
+  doc.text('_____________________________');
+  doc.text('_____________________________');
+  doc.moveDown();
+  doc.font('Helvetica-Bold').text(`Subject: ${subject}`);
+  doc.moveDown();
+  doc.font('Helvetica').text('Dear Sir/Madam,');
+  doc.moveDown();
+  doc.text(
+    `I, ${name || '__________________________'}, a student of this institution, ` +
+    `would like to respectfully request for ______________________________________. ` +
+    `This is in connection with __________________________________________________.`,
+    { lineGap: 5 }
+  );
+  doc.moveDown();
+  doc.text('In view of the above, I am humbly requesting for your kind consideration and approval of this request.');
+  doc.moveDown();
+  doc.text('I hope for your favorable response. Thank you very much.');
+  doc.moveDown(2);
+  doc.text('Respectfully yours,');
+  doc.moveDown(3);
+  line(doc, doc.y, 72, 300);
+  doc.moveDown(0.3);
+  doc.font('Helvetica-Bold').text(name || '______________________________');
+  doc.font('Helvetica').text('Grade/Year & Section: _________________');
+  doc.text('Student ID No.: _______________________');
+  doc.text(`Date: ${today}`);
+
+  doc.fontSize(8).fillColor('#888')
+     .text(`Generated by ${TEAM} via Mirai Bot V3`, 72, 720, { align: 'center', width: 468 });
+
+  doc.end();
+  return new Promise((resolve, reject) => {
+    out.on('finish', () => resolve(fp));
+    out.on('error', reject);
+  });
+}
+
+// ── SCHOOL CLEARANCE ──────────────────────────────────────────────────────────
+function generateClearance(name = '') {
+  const fp  = path.join(TEMP_DIR, `clearance_${Date.now()}.pdf`);
+  const doc = createDoc();
+  const out = fs.createWriteStream(fp);
+  doc.pipe(out);
+  const sy  = `${new Date().getFullYear() - 1}–${new Date().getFullYear()}`;
+
+  doc.fontSize(14).font('Helvetica-Bold').fillColor('#003366')
+     .text('SCHOOL CLEARANCE FORM', { align: 'center' });
+  doc.fontSize(10).font('Helvetica').fillColor('black')
+     .text(`School Year: ${sy}`, { align: 'center' });
+  line(doc, doc.y + 8);
+  doc.moveDown(1);
+
+  let y = doc.y;
+  y = field(doc, 'Student Name:', y, 440);
+  y = twoFields(doc, 'Grade & Section:', 'LRN:', y);
+  y += 10;
+
+  y = sectionHeader(doc, 'CLEARANCE REQUIREMENTS', y);
+  const depts = [
+    'Librarian', 'Cashier / Finance Office', 'Guidance Office',
+    'Subject Teacher — Math', 'Subject Teacher — Science',
+    'Subject Teacher — English', 'Subject Teacher — Filipino',
+    'Subject Teacher — MAPEH', 'Subject Teacher — TLE/TVL',
+    'Class Adviser', 'Registrar', 'School Head / Principal',
+  ];
+  depts.forEach(d => {
+    doc.fontSize(10).fillColor('black').font('Helvetica').text(d, 80, y, { width: 250 });
+    line(doc, y + 14, 360, 540);
+    doc.fontSize(8).fillColor('#888').text('Signature & Date', 362, y + 1);
+    y += 28;
+  });
+
+  y += 10;
+  doc.fontSize(9).font('Helvetica-Oblique').fillColor('#333')
+     .text('This clearance certifies that the above-named student has settled all accountabilities.', 72, y);
+
+  doc.fontSize(8).fillColor('#888')
+     .text(`Generated by ${TEAM} via Mirai Bot V3 | ${new Date().toLocaleDateString('en-PH')}`, 72, 720, { align: 'center', width: 468 });
+
+  doc.end();
+  return new Promise((resolve, reject) => {
+    out.on('finish', () => resolve(fp));
+    out.on('error', reject);
+  });
+}
+
+// ── EXAM PERMIT ───────────────────────────────────────────────────────────────
+function generatePermit(name = '') {
+  const fp  = path.join(TEMP_DIR, `permit_${Date.now()}.pdf`);
+  const doc = createDoc();
+  const out = fs.createWriteStream(fp);
+  doc.pipe(out);
+
+  doc.fontSize(16).font('Helvetica-Bold').fillColor('#003366')
+     .text('EXAMINATION PERMIT', { align: 'center' });
+  doc.fontSize(10).font('Helvetica').fillColor('black')
+     .text(`School Year: ${new Date().getFullYear()}–${new Date().getFullYear() + 1}  |  Semester: _____`, { align: 'center' });
+  line(doc, doc.y + 6);
+  doc.moveDown(1);
+
+  let y = doc.y;
+  y = field(doc, 'Student Name:', y, 440);
+  y = twoFields(doc, 'Student ID No.:', 'Course / Strand:', y);
+  y = twoFields(doc, 'Year & Section:', 'Date Issued:', y);
+
+  y += 6;
+  y = sectionHeader(doc, 'SUBJECTS ENROLLED', y);
+  const subjects = ['Mathematics', 'Science', 'English', 'Filipino', 'Social Studies', 'MAPEH', 'Values Education', 'Elective'];
+  subjects.forEach((s, i) => {
+    doc.fontSize(10).text(`${i + 1}. ${s}`, 80, y);
+    line(doc, y + 14, 300, 540);
+    doc.fontSize(8).fillColor('#888').text("Teacher's Signature", 302, y + 1);
+    doc.fillColor('black');
+    y += 28;
+  });
+
+  y += 10;
+  line(doc, y + 30, 72, 250);
+  doc.fontSize(9).fillColor('#555').text("Registrar's Signature", 72, y + 33);
+  line(doc, y + 30, 300, 540);
+  doc.text("Principal's Signature", 300, y + 33);
+
+  doc.fontSize(8).fillColor('#888')
+     .text(`Generated by ${TEAM} via Mirai Bot V3 | ${new Date().toLocaleDateString('en-PH')}`, 72, 720, { align: 'center', width: 468 });
+
+  doc.end();
+  return new Promise((resolve, reject) => {
+    out.on('finish', () => resolve(fp));
+    out.on('error', reject);
+  });
+}
+
+// ── ENROLLMENT FORM ───────────────────────────────────────────────────────────
+function generateEnrollment(name = '') {
+  const fp  = path.join(TEMP_DIR, `enrollment_${Date.now()}.pdf`);
+  const doc = createDoc();
+  const out = fs.createWriteStream(fp);
+  doc.pipe(out);
+  const sy = `${new Date().getFullYear()}–${new Date().getFullYear() + 1}`;
+
+  doc.fontSize(14).font('Helvetica-Bold').fillColor('#003366')
+     .text('ENROLLMENT FORM', { align: 'center' });
+  doc.fontSize(10).font('Helvetica').fillColor('#003366')
+     .text(`School Year: ${sy}`, { align: 'center' });
+  line(doc, doc.y + 6);
+  doc.moveDown(0.8);
+
+  let y = doc.y;
+  y = sectionHeader(doc, 'I. STUDENT INFORMATION', y);
+  y = field(doc, 'Full Name (Last, First, Middle):', y, 440);
+  y = twoFields(doc, 'LRN:', 'Student ID No.:', y);
+  y = twoFields(doc, 'Grade / Year Level:', 'Section:', y);
+  y = twoFields(doc, 'Track/Strand (SHS):', 'Semester:', y);
+  y = twoFields(doc, 'Date of Birth:', 'Sex:', y);
+  y = field(doc, 'Address:', y, 440);
+  y = twoFields(doc, 'Contact Number:', 'Email:', y);
+
+  y += 6;
+  y = sectionHeader(doc, 'II. PARENT / GUARDIAN INFORMATION', y);
+  y = field(doc, "Parent/Guardian Name:", y, 440);
+  y = twoFields(doc, 'Relationship:', 'Contact Number:', y);
+  y = field(doc, 'Address (if different):', y, 440);
+
+  y += 6;
+  y = sectionHeader(doc, 'III. SUBJECTS / SUBJECTS ENROLLED', y);
+  for (let i = 1; i <= 8; i++) {
+    doc.fontSize(10).fillColor('black').text(`${i}.`, 78, y);
+    line(doc, y + 14, 90, 400);
+    y += 24;
+  }
+
+  y += 8;
+  line(doc, y + 30, 72, 250);
+  line(doc, y + 30, 300, 540);
+  doc.fontSize(9).fillColor('#555').text("Student / Parent Signature", 72, y + 33)
+     .text("Registrar / Class Adviser", 300, y + 33);
+
+  doc.fontSize(8).fillColor('#888')
+     .text(`Generated by ${TEAM} via Mirai Bot V3 | ${new Date().toLocaleDateString('en-PH')}`, 72, 710, { align: 'center', width: 468 });
+
+  doc.end();
+  return new Promise((resolve, reject) => {
+    out.on('finish', () => resolve(fp));
+    out.on('error', reject);
+  });
+}
+
+// ── Command ───────────────────────────────────────────────────────────────────
+module.exports.config = {
+  name:            'pdf',
+  version:         '1.0.0',
+  hasPermssion:    0,
+  credits:         TEAM,
+  description:     'Generate printable PDF forms — school application, clearance, permit, enrollment, letter',
+  commandCategory: 'Utility',
+  usages:          'school|letter|clearance|permit|enrollment [name]',
+  cooldowns:       10
+};
+
+module.exports.run = async function ({ api, event, args }) {
+  const { threadID, messageID } = event;
+  const P    = global.config?.PREFIX || '!';
+  const type = (args[0] || '').toLowerCase();
+  const name = args.slice(1).join(' ').trim();
+
+  const HELP =
+    `📄 ${bold('PDF GENERATOR')}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🆓 Free — Walang bayad, printable!\n\n` +
+    `📋 ${bold('FORMS AVAILABLE:')}\n` +
+    `• ${P}pdf school [name]        — School Application\n` +
+    `• ${P}pdf enrollment [name]    — Enrollment Form\n` +
+    `• ${P}pdf clearance [name]     — School Clearance\n` +
+    `• ${P}pdf permit [name]        — Exam Permit\n` +
+    `• ${P}pdf letter [name] [subj] — Formal Letter\n\n` +
+    `📌 ${bold('PAANO MAG-PRINT:')}\n` +
+    `1. I-download ang PDF file\n` +
+    `2. Buksan sa phone o computer\n` +
+    `3. I-print gamit ang PDF viewer\n\n` +
+    `🏷️ ${bold(TEAM)}`;
+
+  if (!type || type === 'help') {
+    return api.sendMessage(HELP, threadID, messageID);
+  }
+
+  api.setMessageReaction('📄', messageID, () => {}, true);
+
+  const generating = await new Promise(r =>
+    api.sendMessage(`⏳ ${bold('Generating PDF...')} Please wait...`, threadID, (e, info) => r(info))
+  );
+
+  try {
+    let fp;
+    let formName;
+    let emoji;
+
+    switch (type) {
+      case 'school':
+      case 'application':
+        fp = await generateSchoolApplication(name);
+        formName = 'School Application Form';
+        emoji = '🏫';
+        break;
+      case 'enrollment':
+      case 'enroll':
+        fp = await generateEnrollment(name);
+        formName = 'Enrollment Form';
+        emoji = '📋';
+        break;
+      case 'clearance':
+        fp = await generateClearance(name);
+        formName = 'School Clearance Form';
+        emoji = '✅';
+        break;
+      case 'permit':
+        fp = await generatePermit(name);
+        formName = 'Examination Permit';
+        emoji = '🎫';
+        break;
+      case 'letter':
+        fp = await generateFormalLetter(name || 'Student', args.slice(2).join(' ').trim() || 'Request Letter');
+        formName = 'Formal Letter';
+        emoji = '✉️';
+        break;
+      default:
+        api.setMessageReaction('❌', messageID, () => {}, true);
+        return api.sendMessage(HELP, threadID, messageID);
+    }
+
+    api.setMessageReaction('✅', messageID, () => {}, true);
+
+    return api.sendMessage({
+      body:
+        `${emoji} ${bold(formName + ' — READY TO PRINT!')}\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        (name ? `📝 ${bold('Name:')} ${name}\n` : '') +
+        `📄 ${bold('Format:')} PDF (printable)\n` +
+        `📅 ${bold('Date:')} ${new Date().toLocaleDateString('en-PH', { dateStyle: 'long' })}\n\n` +
+        `📲 ${bold('PAANO MAG-PRINT:')}\n` +
+        `1. I-download ang PDF file na ito\n` +
+        `2. Buksan sa iyong PDF app/viewer\n` +
+        `3. Pindutin ang Print button\n` +
+        `4. I-fill out ang mga blank fields\n\n` +
+        `🏷️ ${bold(TEAM)}`,
+      attachment: fs.createReadStream(fp)
+    }, threadID, () => cleanup(fp));
+
+  } catch (e) {
+    api.setMessageReaction('❌', messageID, () => {}, true);
+    return api.sendMessage(`❌ ${bold('PDF generation failed.')}\n🔧 ${e.message}`, threadID, messageID);
+  }
+};

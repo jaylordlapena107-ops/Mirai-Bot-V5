@@ -41,16 +41,17 @@ async function generateImage(prompt, width = 1080, height = 1080) {
 
 // ── STARTCOPE NEWS prompt builder ─────────────────────────────────────────────
 function buildNewsPrompt(title = 'Breaking News', extra = '') {
+  const safeTitle = title.slice(0, 60).replace(/"/g, "'");
   return (
-    `professional broadcast news graphic design, STARTCOPE NEWS, ` +
-    `bold vibrant star logo at top center made of 5 geometric triangles in Google Play Store colors ` +
-    `(blue #4285f4 green #34a853 yellow #fbbc05 red #ea4335), ` +
-    `dark navy blue gradient background, glowing neon accent lines, ` +
-    `large bold white text "STARTCOPE NEWS" below the star logo, ` +
-    `news headline text in bright yellow: "${title.slice(0, 80)}", ` +
-    `modern TV news lower third bar at bottom in red with white text "POWERED BY TEAM STARTCOPE BETA", ` +
-    `ultra HD 4K quality, professional broadcast television style, photorealistic, ` +
-    `sharp text, clean layout, no blur, dramatic lighting${extra ? ', ' + extra : ''}`
+    `professional Philippine TV news broadcast lower third graphic, ` +
+    `five-pointed star logo at top center with Google Play Store gradient colors: blue green yellow red, ` +
+    `text "STARTCOPE" in large bold white sans-serif font, text "NEWS" in red bold font below star, ` +
+    `dark navy blue solid background, glowing red accent horizontal bar, ` +
+    `headline in large bright yellow bold text: "${safeTitle}", ` +
+    `red banner strip at bottom with crisp white text: TEAM STARTCOPE BETA, ` +
+    `ultra HD 4K, 100% sharp and legible text, high contrast, clean minimal layout, ` +
+    `no decorative patterns overlapping text, professional broadcast design, photorealistic` +
+    (extra ? `, ${extra}` : '')
   );
 }
 

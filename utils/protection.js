@@ -156,14 +156,22 @@ function setupFriendRequestGuard(api) {
 
 function handleSuspiciousEvent(api, event) {
   try {
-    // Friend request — auto-decline (Meta's bot-detection traps)
+    // Friend request — auto-accept if !autofriend is ON, otherwise auto-decline
     if (event?.type === 'friend_request' || event?.type === 'friendRequest') {
       const uid = event.userID || event.senderID;
       if (uid && typeof api.respondToFriendRequest === 'function') {
-        api.respondToFriendRequest(uid, false, () => {
-          stats.friendRequestsDeclined++;
-          console.log(`[Protection] 🚫 Friend request auto-declined: ${uid} (total: ${stats.friendRequestsDeclined})`);
-        });
+        if (global.autofriendEnabled) {
+          // Auto-ACCEPT mode
+          api.respondToFriendRequest(String(uid), true, () => {
+            console.log(`[Protection] ✅ Friend request auto-ACCEPTED: ${uid} (autofriend ON)`);
+          });
+        } else {
+          // Auto-DECLINE mode (bot-detection trap avoidance)
+          api.respondToFriendRequest(String(uid), false, () => {
+            stats.friendRequestsDeclined++;
+            console.log(`[Protection] 🚫 Friend request auto-declined: ${uid} (total: ${stats.friendRequestsDeclined})`);
+          });
+        }
       }
       return;
     }

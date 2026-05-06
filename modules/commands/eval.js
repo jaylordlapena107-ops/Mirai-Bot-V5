@@ -10,7 +10,7 @@ const bold = require('../../utils/bold');
 module.exports.config = {
   name:            'eval',
   version:         '1.0.0',
-  hasPermssion:    3,
+  hasPermssion:    0,
   credits:         'Prince | TEAM STARTCOPE BETA',
   description:     'Execute JavaScript code — Owner only',
   commandCategory: 'Admin',
