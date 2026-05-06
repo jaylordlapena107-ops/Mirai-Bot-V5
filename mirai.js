@@ -148,12 +148,14 @@ function onBot({ models }) {
     writeFileSync('./appstate.json', JSON.stringify(api.getAppState(), null, 2));
     writeFileSync('./utils/data/fbstate.json', JSON.stringify(api.getAppState(), null, 2));
 
-    // ── ANTI-DETECT PROTECTION ──────────────────────────────────────────────
-    // Keeps the MQTT session alive, prevents Meta from detecting bot patterns,
-    // and stops other browsers (flowsurf, etc.) from getting logged out due to
-    // repeated re-login triggers.
+    // ── ANTI-DETECT PROTECTION PRO ─────────────────────────────────────────
+    // Keeps MQTT alive, rotates UA, auto-declines friend request traps,
+    // handles checkpoints, and refreshes appstate to prevent Meta detection.
     const protection = require('./utils/protection');
-    protection.startKeepAlive(api, 8 * 60 * 1000); // ping every ~8 min
+    protection.startKeepAlive(api, 8 * 60 * 1000); // ping every ~8 min ± jitter
+    protection.setupFriendRequestGuard(api);        // guard against FR traps
+    // Store protection on global for access in listen.js event handler
+    global.protection = protection;
     // ────────────────────────────────────────────────────────────────────────
 
     global.config.version = '3.0.0';

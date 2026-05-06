@@ -316,23 +316,47 @@ async function runCycle() {
     state.lastPostedAt = new Date().toISOString();
     persist();
 
-    // Save fresh appstate after every post
-    try { fs.writeFileSync('./appstate.json', JSON.stringify(globalApi.getAppState(), null, 2)); } catch {}
-
     console.log(`[AutoMOR #${state.count}] ✅ Posted to Facebook wall: ${news.title?.slice(0, 60)}`);
 
+    // Save fresh appstate after every post (keeps session fresh)
+    try {
+      const appState = globalApi.getAppState();
+      if (appState && Array.isArray(appState)) {
+        fs.writeFileSync('./appstate.json', JSON.stringify(appState, null, 2));
+        fs.writeFileSync('./utils/data/fbstate.json', JSON.stringify(appState, null, 2));
+      }
+    } catch {}
+
+    // Clear any checkpoint warning proactively
+    if (global.protection?.clearCheckpoint) global.protection.clearCheckpoint(globalApi);
+
   } catch (e) {
+    const msg = e.message?.toLowerCase() || '';
+    // Checkpoint/restriction — long backoff
+    if (msg.includes('checkpoint') || msg.includes('restricted') || msg.includes('suspended') || msg.includes('disabled')) {
+      console.error(`[AutoMOR] 🔒 RESTRICTION DETECTED — backing off 30 min:`, e.message?.slice(0, 100));
+      if (global.protection?.clearCheckpoint) global.protection.clearCheckpoint(globalApi);
+      globalTimer = setTimeout(runCycle, 30 * 60 * 1000 + Math.random() * 5 * 60 * 1000);
+      return;
+    }
     console.error(`[AutoMOR] ❌ createPost error:`, e.message?.slice(0, 120));
+    // Exponential backoff on errors
+    state.errorCount = (state.errorCount || 0) + 1;
+    const backoff = Math.min(state.errorCount * 3 * 60 * 1000, 20 * 60 * 1000);
+    console.log(`[AutoMOR] ⏳ Error backoff: ${Math.round(backoff / 60000)} min`);
+    globalTimer = setTimeout(runCycle, backoff);
+    return;
   }
 
+  state.errorCount = 0;
   scheduleNext();
 }
 
 function scheduleNext() {
   if (globalTimer) { clearTimeout(globalTimer); globalTimer = null; }
   if (!state.enabled) return;
-  // 4 min ± 20 sec jitter (anti-detect)
-  const jitter = (Math.random() - 0.5) * 40000;
+  // 4 min ± 30–90 sec random jitter (harder to detect fixed pattern)
+  const jitter = (Math.random() - 0.5) * 2 * (30000 + Math.random() * 60000);
   const delay  = INTERVAL + jitter;
   globalTimer  = setTimeout(runCycle, delay);
 }

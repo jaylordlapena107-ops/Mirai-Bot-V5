@@ -55,13 +55,18 @@ A Facebook Messenger chatbot built with Node.js that listens for messages and re
 - Broadcast uses jitter scheduling (±5 min) to avoid Meta pattern detection
 - `utils/protection.js` provides keep-alive pings, UA rotation, and request rate limiting
 
-## Anti-Detect Protection (utils/protection.js)
-- **Keep-alive**: pings Facebook API every ~8 min to maintain MQTT session without re-login
-- **No re-login trigger**: appstate is reused as-is; no fresh login that would invalidate other browser sessions (flowsurf, etc.)
-- **User-agent rotation**: 9 real Chrome/Firefox/Safari/Edge UA strings
+## Anti-Detect Protection PRO (utils/protection.js)
+- **Keep-alive**: pings Facebook API every ~8 min ± 2 min jitter, rotates strategy (thread list / user info / passive)
+- **Friend request guard**: auto-declines all incoming friend requests (potential Meta bot-detection traps)
+- **Suspicious event handler**: auto-marks notifications as read, handles any other suspicious event types
+- **Checkpoint recovery**: `clearCheckpoint()` proactively clears Facebook scraping warnings after every post
+- **Restriction detection**: autopost/automor detect checkpoint/suspended/restricted errors → 30 min backoff + auto-recover
+- **Exponential backoff**: on any API error, waits progressively longer before retrying (up to 30 min)
+- **Appstate refresh**: saves fresh `appstate.json` + `fbstate.json` after every 5 keep-alive ticks and every post
+- **User-agent rotation**: 13 real Chrome/Firefox/Safari/Edge/Mobile UA strings
 - **Rate limiter**: max 8 sends/minute global throttle
-- **Jitter scheduling**: broadcast uses ±5 min random delay to avoid pattern detection
-- **Browser headers**: `fca-config.json` sets Accept, Accept-Language, DNT, Sec-Fetch headers
+- **Jitter scheduling**: autopost ±8–15 min, automor ±30–90 sec — harder to fingerprint
+- **Browser headers**: 12 Sec-Fetch/Sec-CH-UA/DNT headers matching real Chrome 124
 
 ## Product
 - Responds to commands with a configurable prefix (default: `!`)

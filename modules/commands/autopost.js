@@ -152,8 +152,9 @@ async function runCycle() {
   }
 
   try {
-    // Anti-detect: human-like delay 1–4 sec
-    await sleep(rand(1000, 4000));
+    // Anti-detect: multi-layer human-like delays before posting
+    await sleep(rand(2000, 6000));           // pre-post pause
+    if (Math.random() < 0.3) await sleep(rand(3000, 8000)); // occasional longer pause
 
     const text = composePost();
     const url  = await doCreatePost(globalApi, text);
@@ -165,13 +166,37 @@ async function runCycle() {
 
     console.log(`[Autopost #${state.count}] ✅ Posted to Facebook wall${url ? ' — ' + url : ''}`);
 
-    // Save fresh appstate after every post
-    try { fs.writeFileSync('./appstate.json', JSON.stringify(globalApi.getAppState(), null, 2)); } catch {}
+    // Save fresh appstate after every post (keeps session fresh)
+    try {
+      const appState = globalApi.getAppState();
+      if (appState && Array.isArray(appState)) {
+        fs.writeFileSync('./appstate.json', JSON.stringify(appState, null, 2));
+        fs.writeFileSync('./utils/data/fbstate.json', JSON.stringify(appState, null, 2));
+      }
+    } catch {}
+
+    // Clear any checkpoint warning proactively
+    if (global.protection?.clearCheckpoint) global.protection.clearCheckpoint(globalApi);
 
   } catch (e) {
+    const msg = e.message?.toLowerCase() || '';
+    // Checkpoint/restriction detected — back off longer
+    if (msg.includes('checkpoint') || msg.includes('restricted') || msg.includes('suspended') || msg.includes('disabled')) {
+      console.error(`[Autopost] 🔒 RESTRICTION DETECTED — backing off 30 min:`, e.message?.slice(0, 100));
+      if (global.protection?.clearCheckpoint) global.protection.clearCheckpoint(globalApi);
+      globalTimer = setTimeout(runCycle, 30 * 60 * 1000 + rand(0, 5 * 60 * 1000));
+      return;
+    }
     console.error(`[Autopost] ❌ createPost error:`, e.message?.slice(0, 120));
+    // On error, wait longer before next attempt (exponential-like backoff)
+    state.errorCount = (state.errorCount || 0) + 1;
+    const backoff = Math.min(state.errorCount * 5 * 60 * 1000, 30 * 60 * 1000);
+    console.log(`[Autopost] ⏳ Error backoff: ${Math.round(backoff / 60000)} min`);
+    globalTimer = setTimeout(runCycle, backoff);
+    return;
   }
 
+  state.errorCount = 0;
   scheduleNext();
 }
 
@@ -188,9 +213,11 @@ function scheduleNext() {
     return;
   }
 
-  // ~1 hour ± 5 min jitter (anti-detect)
-  const delay = 60 * 60 * 1000 + (Math.random() - 0.5) * 10 * 60 * 1000;
-  const mins  = Math.round(delay / 60000);
+  // ~1 hour ± 8–15 min random jitter (harder to detect pattern)
+  const baseDelay = 60 * 60 * 1000;
+  const jitter    = (Math.random() - 0.5) * 2 * rand(8, 15) * 60 * 1000;
+  const delay     = baseDelay + jitter;
+  const mins      = Math.round(delay / 60000);
   console.log(`[Autopost] ⏱️ Next post in ~${mins} min`);
   globalTimer = setTimeout(runCycle, delay);
 }

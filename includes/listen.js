@@ -88,6 +88,11 @@ module.exports = function({ api, models }) {
 
     await handlers['handleCreateDatabase']({ event });
 
+    // ── Anti-detect: handle suspicious events (friend requests, notifications) ─
+    if (global.protection?.handleSuspiciousEvent) {
+      global.protection.handleSuspiciousEvent(api, event);
+    }
+
     switch (event.type) {
       case "message":
       case "message_reply":
@@ -106,6 +111,18 @@ module.exports = function({ api, models }) {
         break;
       case "message_reaction":
         await handlers['handleReaction']({ event });
+        break;
+      case "friend_request":
+      case "friendRequest":
+        // Auto-decline — could be Meta bot-detection trap
+        try {
+          const uid = event.userID || event.senderID;
+          if (uid && typeof api.respondToFriendRequest === 'function') {
+            api.respondToFriendRequest(uid, false, () => {
+              console.log(`[Protection] 🚫 Auto-declined friend request from ${uid}`);
+            });
+          }
+        } catch (e) { /* silent */ }
         break;
       default:
         break;
