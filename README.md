@@ -1,81 +1,192 @@
-# Mirai Bot Unofficial🤖<sub><sub>v3.0.0🚀</sub></sub>
+# Mirai Bot V3 Unofficial 🤖
+
 <p align="center">
-    <a href="https://nodejs.org/dist/v20.17.0"><img src="https://img.shields.io/badge/Nodejs%20Support-20.x-brightgreen.svg?style=flat-square" alt="Nodejs Support v20.x"></a>
-    <img alt="size" src="https://img.shields.io/github/repo-size/DongDev-VN/Mirai-Bot-V3.svg?style=flat-square&label=size">
-    <img alt="code-version" src="https://img.shields.io/badge/dynamic/json?color=red&label=code%20version&prefix=v&query=%24.version&url=https://raw.githubusercontent.com/DongDev-VN/Mirai-Bot-V3/refs/heads/main/package.json&style=flat-square">
-    <a href="https://github.com/DongDev-VN/Mirai-Bot-V3/commits"><img alt="Commits" src="https://img.shields.io/github/commit-activity/m/DongDev-VN/Mirai-Bot-V3.svg?label=commit&style=flat-square"></a>
-<img alt="Visitors" src="https://visitor-badge.laobi.icu/badge?page_id=DongDev-VN.Mirai-Bot-V3">
-<img alt="size" src="https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square&color=brightgreen">
-<a href="https://github.com/DongDev-VN/Mirai-Bot-V3"><img src="https://i.imgur.com/sxW5AWa.png" alt="Logo"></a>
-<p align="center">
-    A Simple MiraiBot for starting a Messenger Chatbot.
-    <br />
-    <br />
-    
-## 📝 **introduce**
-<p>
-<strong>Mirai Bot V3 Unofficial</strong> Là một dự án được DongDev update và tiếp tục phát triển từ project Mirai-V2 của Catalizcs and SpermLord xây dựng.
+  <img src="https://img.shields.io/badge/Node.js-20.x-brightgreen?style=flat-square"/>
+  <img src="https://img.shields.io/badge/Platform-Facebook%20Messenger-blue?style=flat-square"/>
+  <img src="https://img.shields.io/badge/License-GPL--3.0-green?style=flat-square"/>
+  <img src="https://img.shields.io/badge/AI-Drian%20AI%20%7C%20Christopher%20AI-purple?style=flat-square"/>
+  <img src="https://img.shields.io/badge/Team-STARTCOPE%20BETA-orange?style=flat-square"/>
 </p>
 
-## 📜 **Installation**
+> A powerful Facebook Messenger chatbot powered by **Drian AI** & **Christopher AI** — built by **TEAM STARTCOPE BETA**.  
+> Free AI features: chat, image generation, image analysis, video generation & voice music — **no API key required**.
 
-Sau đây là các bước cơ bản để có thể cài đặt và vận hành.
+---
 
-### 💡 **Yêu cầu**
+## 🤖 AI Features
 
-- Dung lượng của máy phải trống tầm 1-2gb.
-- Cần một số phần mềm chỉnh sửa file, khuyến khích sử dụng [notepad++](https://notepad-plus-plus.org/downloads/) hoặc [sublime text 3](https://www.sublimetext.com/3)
-- Cần hiểu biết sơ lược qua về node, javascript.
-- Một tài khoản Facebook dùng để làm bot(Khuyến khích nên sử dụng acc đã bỏ hoặc không còn sử dụng để tránh mất acc hay acc bị khoá).
-- Đối với:
-    - Windows: Cần cài đặt windows-build-tools.
-    - Linux: Cần cài đặt python3 hoặc python2.
-    - Android Sử dụng termux để vận hành bot.
+### 🟢 Drian AI (by Manuelson Yasis | TEAM STARTCOPE BETA)
+| Command | Description |
+|---|---|
+| `!drian [tanong]` | Chat — unlimited, no memory limit |
+| `!drian imagine [prompt]` | Generate HD image (1024×1024) |
+| `!drian analyze` + attach photo | Analyze & describe an image |
+| Reply → `edit [prompt]` | Edit a generated image |
+| `!drian reset` | Clear conversation history |
 
-### ⚙️ **Cài Đặt**
+### 🔷 Christopher AI (by TEAM STARTCOPE BETA)
+| Command | Description |
+|---|---|
+| `!christopher [tanong]` | Deep research & professional answers |
+| `!christopher imagine [prompt]` | Generate HD image |
+| `!christopher analyze` + photo | Analyze image professionally |
+| Reply → `edit [prompt]` | Edit generated image |
+| `!christopher reset` | Clear conversation |
 
-1. Tải về [Nodejs](https://nodejs.org/en/) và [git](https://git-scm.com/) sau đó cài đặt
-2. Clone source code của bot
-    1. chuột phải ở folder cần cài đặt source code nhấn vào git bash
-    2. nhập
-    ```sh
-    git clone https://github.com/DongDev-VN/Mirai-Bot-V3 Mirai-Bot-V3
-    ```
-    
-3. Cài đặt các package cần thiết
-    1. Mở cmd/terminal ở thư mục bot, LƯU Ý thư mục đó phải có file package.json
-    2. Nhập
-    ```sh
-    npm install
-    ```
-    
-4. Chỉnh sửa file config
-    1. Mở file config.json thông qua notepad++ hoặc sublime text 3 đã cài đặt ở trên
-    2. tùy chỉnh id admin, tên bot, ...
-    3. Sao lưu và đóng lại
-    
-5. Lấy cookie
-    - Bạn có thể sử dụng cookie từ extension, hoặc f12 lên để lấy cookie
-    - Tạo file cookie.txt và paste cookie vào, save để lưu
-      
-6. Chạy bot và tận hưởng
-    1. Nhập
-    ```sh
-      npm start
-      ```
-    2. Đợi source code load file và tận hưởng!
+### 🎬 Video AI
+| Command | Description |
+|---|---|
+| `!video [prompt]` | Generate MP4 video (3 scenes, ~12 sec) |
+| `!video movie [konsepto]` | Tagalog movie-style video (8 scenes) |
+| `!video scenes [num] [prompt]` | Custom scene count (2–15) |
+| Attach photo + `!video [prompt]` | Create video from your photo |
 
-## 📚 **Contributing**
+### 🎵 Music AI
+| Command | Description |
+|---|---|
+| `!music [request]` | Generate song lyrics + voice audio |
+| `!music chat [tanong]` | Chat about music |
+| `!music lyrics [tema]` | Show lyrics only (no audio) |
+| `!music reset` | Clear conversation |
 
-Sự đóng góp của bạn sẽ khiến cho project ngày càng tốt hơn, các bước để bạn có thể đóng góp
+> All AI features use **100% free APIs** — no API keys, no registration, no cost.
 
-1. Fork project này
-2. Tạo một branch mới chứa tính năng của bạn (`git checkout -b feature/AmazingFeature`)
-3. Commit những gì bạn muốn đóng góp (`git commit -m 'Add some AmazingFeature'`)
-4. Đẩy branch chứa tính năng của bạn lên (`git push origin feature/AmazingFeature`)
-5. Tạo một pull request mới và sự đóng góp của bạn đã sẵn sàng để có thể đóng góp!
+---
 
-<!-- CONTACT -->
-## ☎️ **Contact**
+## 📦 Other Commands
 
-- DongDev - [Facebook](https://facebook.com/minhdong.dev) - [GitHub](https://github.com/DongDev-VN) - dongdz.user@gmail.com
+| Category | Commands |
+|---|---|
+| General | `!help`, `!ping`, `!uid`, `!upt` |
+| Group | `!prefix`, `!setname`, `!anti`, `!duyet` |
+| Admin | `!admin`, `!cmd`, `!shell`, `!run` |
+| Economy | `!money` |
+| Utility | `!note`, `!menu`, `!contact`, `!qtv` |
+
+---
+
+## 🚀 Quick Setup
+
+### Requirements
+- **Node.js 20+**
+- **Facebook account** (dedicated bot account recommended)
+- `appstate.json` or `cookie.txt` (Facebook session)
+
+### Installation
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/DongDev-VN/Mirai-Bot-V3
+cd Mirai-Bot-V3
+
+# 2. Install dependencies
+npm install
+
+# 3. Add your Facebook credentials
+# Option A: Paste your appstate (JSON array) into appstate.json
+# Option B: Paste cookies into cookie.txt
+
+# 4. Configure the bot
+# Edit config.json — set ADMINBOT, PREFIX, BOTNAME, etc.
+
+# 5. Start the bot
+npm start
+```
+
+---
+
+## ⚙️ Configuration (`config.json`)
+
+```json
+{
+  "PREFIX": "!",
+  "BOTNAME": "Mirai-V3",
+  "ADMINBOT": ["your_facebook_id"],
+  "language": "en",
+  "FCAOption": { "listenEvents": true, "autoReconnect": true }
+}
+```
+
+---
+
+## ☁️ Deployment
+
+### Render.com (Recommended — Best for persistent bots)
+1. Push to GitHub
+2. Create a new **Background Worker** on Render
+3. Build command: `npm install`
+4. Start command: `node index.js`
+5. Add environment variable: `appstate.json` content as `APPSTATE` (optional)
+
+### Railway / Heroku
+- Uses `Procfile` → `web: node index.js`
+- Set `PORT` env var if required by platform
+- Bot includes a built-in HTTP health check server on `$PORT`
+
+### Other Platforms
+- **Glitch**: Works out of the box — `npm start`
+- **VPS/Linux**: Run with `pm2 start index.js --name mirai-bot`
+- **Netlify / Vercel**: Not recommended (serverless, no persistent connections)
+
+---
+
+## 🌐 Free APIs Used (No Keys Required)
+
+| Feature | API |
+|---|---|
+| 💬 AI Chat | `https://text.pollinations.ai/` |
+| 🎨 Image Generation | `https://image.pollinations.ai/prompt/[prompt]` |
+| 🔍 Image Analysis (Vision) | `https://api.airforce/v1/chat/completions` |
+| 🎵 Voice/TTS Audio | `https://translate.google.com/translate_tts` |
+| 🎬 Video | FFmpeg + Pollinations image frames |
+
+---
+
+## 🗂️ Project Structure
+
+```
+Mirai-Bot-V3/
+├── index.js              # Entry point + HTTP health check
+├── mirai.js              # Main bot logic (login, MQTT, module loader)
+├── config.json           # Bot configuration
+├── modules/
+│   ├── commands/         # All bot commands (drian, christopher, video, music, etc.)
+│   └── events/           # Event handlers (join/leave notifications)
+├── includes/
+│   ├── database/         # SQLite + Sequelize models
+│   ├── controllers/      # Users, Threads, Currencies controllers
+│   └── handle/           # Message/command/event handlers
+├── languages/            # en.lang, vi.lang
+├── utils/                # Logging, bold font, utilities
+├── Procfile              # For Heroku/Railway deployment
+├── render.yaml           # For Render.com deployment
+└── appstate.json         # Facebook credentials (gitignored)
+```
+
+---
+
+## ⚠️ Important Notes
+
+- `appstate.json` and `cookie.txt` are in `.gitignore` — **never commit credentials**
+- `appstate.json` must be a **valid JSON array** (not placeholder text)
+- Bot auto-restarts on crash (up to 5 times via `index.js`)
+- Render.com **Worker** is the best fit — MQTT needs a persistent connection
+- All AI features work without any API keys
+
+---
+
+## 👥 Credits
+
+| Name | Role |
+|---|---|
+| **Manuelson Yasis** | Creator of Drian AI |
+| **TEAM STARTCOPE BETA** | Christopher AI, Video AI, Music AI |
+| DongDev | Original Mirai Bot V3 framework |
+| CatalizCS & SpermLord | Original Mirai V2 |
+
+---
+
+## 📞 Contact
+
+- Facebook: [Manuelson Yasis](https://www.facebook.com/manuelson.yasis)
+- Team: TEAM STARTCOPE BETA

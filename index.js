@@ -1,22 +1,37 @@
 const { spawn } = require("child_process");
+const http = require("http");
 const logger = require("./utils/log");
+
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+        status: "online",
+        bot: "Mirai Bot V3",
+        version: "3.0.0",
+        team: "TEAM STARTCOPE BETA",
+        uptime: process.uptime()
+    }));
+}).listen(PORT, () => {
+    logger(`Health check server running on port ${PORT}`, "[ SERVER ]");
+});
+
 function startBot(message) {
-    (message) ? logger(message, "[ Starting ]") : "";
+    if (message) logger(message, "[ Starting ]");
     const child = spawn("node", ["--trace-warnings", "--async-stack-traces", "mirai.js"], {
         cwd: __dirname,
         stdio: "inherit",
         shell: true
     });
     child.on("close", (codeExit) => {
-        if (codeExit != 0 || global.countRestart && global.countRestart < 5) {
+        if (codeExit !== 0 || (global.countRestart && global.countRestart < 5)) {
+            global.countRestart = (global.countRestart || 0) + 1;
             startBot("Restarting...");
-            global.countRestart += 1;
-            return;
-        } else return;
+        }
     });
-
-    child.on("error", function (error) {
+    child.on("error", (error) => {
         logger("An error occurred: " + JSON.stringify(error), "[ Starting ]");
     });
-};
+}
+
 startBot();
