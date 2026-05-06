@@ -59,16 +59,24 @@ module.exports.config = {
   version: '1.0.0',
   hasPermssion: 0,
   credits: 'TEAM STARTCOPE BETA',
-  description: 'Auto-broadcasts Jesus & remembrance messages to all GCs every 3 minutes 24/7',
+  description: 'Auto-broadcasts Jesus & remembrance messages to all GCs every ~1 hour 24/7',
   eventType: [],
 };
 
 module.exports.onLoad = function ({ api }) {
   broadcastApi = api;
   if (broadcastInterval) clearInterval(broadcastInterval);
-  // 3 minutes = 180,000 ms
-  broadcastInterval = setInterval(sendToAllGroups, 3 * 60 * 1000);
-  console.log('[Broadcast] ✅ Auto-broadcast started — every 3 minutes to all GCs');
+  // 1 hour = 3,600,000 ms  (with ±5 min random jitter to avoid Meta pattern detection)
+  const scheduleNext = () => {
+    const jitter = (Math.random() - 0.5) * 10 * 60 * 1000; // ±5 min
+    const delay = 60 * 60 * 1000 + jitter;
+    broadcastInterval = setTimeout(async () => {
+      await sendToAllGroups();
+      scheduleNext();
+    }, delay);
+  };
+  scheduleNext();
+  console.log('[Broadcast] ✅ Auto-broadcast started — every ~1 hour (with jitter) to all GCs');
 };
 
 module.exports.run = async function () {};
