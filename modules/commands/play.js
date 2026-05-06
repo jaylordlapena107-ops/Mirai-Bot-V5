@@ -6,7 +6,7 @@ const VERSION = '5.0.0';
 const TEAM = 'TEAM STARTCOPE BETA';
 const STREAM_URL = 'https://hrmanila.radioca.st/stream';
 const TEMP_DIR = path.join(process.cwd(), 'utils/data/play_temp');
-const CHUNK_SECONDS = 180; // 3 minutes per voice message chunk
+const CHUNK_SECONDS = 18000; // 5 hours per voice message chunk
 
 fs.ensureDirSync(TEMP_DIR);
 
@@ -23,7 +23,7 @@ function captureChunk(outPath) {
       '-vn -ar 44100 -ac 2 -b:a 64k',
       `-f mp3 "${outPath}"`
     ].join(' ');
-    exec(cmd, { timeout: (CHUNK_SECONDS + 30) * 1000 }, (err, _, stderr) => {
+    exec(cmd, { timeout: (CHUNK_SECONDS + 120) * 1000 }, (err, _, stderr) => {
       if (err) return rej(new Error(stderr?.slice(-200) || err.message));
       res();
     });
