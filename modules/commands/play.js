@@ -6,7 +6,7 @@ const VERSION = '5.0.0';
 const TEAM = 'TEAM STARTCOPE BETA';
 const STREAM_URL = 'https://hrmanila.radioca.st/stream';
 const TEMP_DIR = path.join(process.cwd(), 'utils/data/play_temp');
-const CHUNK_SECONDS = 18000; // 5 hours per voice message chunk
+const CHUNK_SECONDS = 10800; // 3 hours per voice message chunk
 
 fs.ensureDirSync(TEMP_DIR);
 

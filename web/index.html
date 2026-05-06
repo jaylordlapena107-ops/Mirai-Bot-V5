@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MIRAI — Free Music Search & Download</title>
+  <style>
+    :root {
+      --green: #1db954;
+      --dark: #0d0d0d;
+      --card: #181818;
+      --card2: #242424;
+      --sub: #b3b3b3;
+      --radius: 10px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--dark); color: #fff; font-family: 'Segoe UI', Tahoma, sans-serif; min-height: 100vh; }
+
+    /* HEADER */
+    header {
+      background: linear-gradient(135deg, #1db954 0%, #1565c0 45%, #6a0dad 100%);
+      padding: 50px 20px 80px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 60px;
+      background: linear-gradient(to bottom, transparent, var(--dark));
+    }
+    .logo { font-size: 64px; font-weight: 900; letter-spacing: -2px; text-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+    .tagline { font-size: 13px; letter-spacing: 5px; color: rgba(255,255,255,0.9); margin-top: 8px; font-weight: 700; text-transform: uppercase; }
+    .badge { display: inline-block; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; padding: 4px 14px; font-size: 11px; margin-top: 10px; letter-spacing: 2px; }
+
+    /* SEARCH */
+    .search-wrap {
+      max-width: 680px;
+      margin: -28px auto 36px;
+      padding: 0 20px;
+      position: relative;
+      z-index: 10;
+    }
+    .search-box {
+      display: flex;
+      background: #fff;
+      border-radius: 50px;
+      overflow: hidden;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+    .search-box input {
+      flex: 1;
+      padding: 18px 24px;
+      border: none;
+      outline: none;
+      font-size: 16px;
+      color: #111;
+      background: transparent;
+    }
+    .search-box button {
+      padding: 0 28px;
+      background: var(--green);
+      border: none;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: background 0.2s;
+    }
+    .search-box button:hover { background: #1ed760; }
+    .search-box button:disabled { background: #444; cursor: not-allowed; }
+
+    /* RESULTS */
+    .results-wrap { max-width: 860px; margin: 0 auto; padding: 0 20px 80px; }
+    .section-label { font-size: 11px; letter-spacing: 3px; color: var(--sub); font-weight: 700; text-transform: uppercase; margin-bottom: 16px; }
+
+    .track-list { display: flex; flex-direction: column; gap: 6px; }
+    .track-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: background 0.2s;
+    }
+    .track-card:hover { background: var(--card2); }
+    .track-num { width: 22px; text-align: center; color: var(--sub); font-size: 14px; flex-shrink: 0; }
+    .track-thumb {
+      width: 52px; height: 52px;
+      border-radius: 6px;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: #333;
+    }
+    .thumb-placeholder { width: 52px; height: 52px; border-radius: 6px; background: #2a2a2a; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    .track-info { flex: 1; min-width: 0; }
+    .track-title { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .track-artist { font-size: 13px; color: var(--sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .track-dur { color: var(--sub); font-size: 13px; flex-shrink: 0; min-width: 44px; text-align: right; }
+    .dl-btn {
+      padding: 8px 18px;
+      background: var(--green);
+      border: none;
+      border-radius: 20px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+    }
+    .dl-btn:hover { background: #1ed760; transform: scale(1.05); }
+    .dl-btn:disabled { background: #444; cursor: not-allowed; transform: none; }
+
+    /* STATES */
+    .state { text-align: center; padding: 60px 20px; color: var(--sub); }
+    .state-icon { font-size: 52px; margin-bottom: 14px; }
+    .state-title { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    .state-sub { font-size: 14px; }
+    .spinner { width: 36px; height: 36px; border: 3px solid #2a2a2a; border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* FOOTER */
+    footer { text-align: center; padding: 16px; color: #444; font-size: 11px; letter-spacing: 1px; border-top: 1px solid #1a1a1a; }
+
+    @media (max-width: 560px) {
+      .logo { font-size: 44px; }
+      .track-dur { display: none; }
+      .dl-btn { padding: 7px 12px; font-size: 11px; }
+      .track-num { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🎵 MIRAI</div>
+  <div class="tagline">Spotify Free — Search + Download</div>
+  <div class="badge">📻 HOME RADIO 95.1 NAGA · MOR NAGA · ONLINE LIVE</div>
+</header>
+
+<div class="search-wrap">
+  <div class="search-box">
+    <input type="text" id="q" placeholder="Search songs, artists, albums..." autocomplete="off" />
+    <button id="searchBtn" onclick="doSearch()">🔍 SEARCH</button>
+  </div>
+</div>
+
+<div class="results-wrap">
+  <div id="label" class="section-label" style="display:none"></div>
+  <div id="results">
+    <div class="state">
+      <div class="state-icon">🎵</div>
+      <div class="state-title">MIRAI Music Search</div>
+      <div class="state-sub">Type a song or artist name above and press Search</div>
+    </div>
+  </div>
+</div>
+
+<footer>MIRAI BOT V3 · TEAM STARTCOPE BETA · HOME RADIO 95.1 NAGA 2026</footer>
+
+<script>
+  const qEl = document.getElementById('q');
+  const resultsEl = document.getElementById('results');
+  const labelEl = document.getElementById('label');
+  const btn = document.getElementById('searchBtn');
+
+  qEl.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+  function fmtDur(s) {
+    if (!s) return '--:--';
+    return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  }
+  function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  async function doSearch() {
+    const q = qEl.value.trim();
+    if (!q) return;
+    btn.disabled = true;
+    btn.textContent = '⏳ ...';
+    labelEl.style.display = 'none';
+    resultsEl.innerHTML = `<div class="state"><div class="spinner"></div><div class="state-sub">Searching for "${esc(q)}"...</div></div>`;
+
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      if (!data.results || !data.results.length) {
+        resultsEl.innerHTML = `<div class="state"><div class="state-icon">😔</div><div class="state-title">No results</div><div class="state-sub">Try a different search</div></div>`;
+        labelEl.style.display = 'none';
+      } else {
+        labelEl.textContent = `${data.results.length} results for "${q}"`;
+        labelEl.style.display = 'block';
+        resultsEl.innerHTML = `<div class="track-list">${data.results.map((r,i) => `
+          <div class="track-card">
+            <div class="track-num">${i+1}</div>
+            ${r.thumbnail
+              ? `<img class="track-thumb" src="${esc(r.thumbnail)}" alt="" onerror="this.outerHTML='<div class=\\'thumb-placeholder\\'>🎵</div>'" />`
+              : `<div class="thumb-placeholder">🎵</div>`}
+            <div class="track-info">
+              <div class="track-title">${esc(r.title)}</div>
+              <div class="track-artist">${esc(r.artist)}</div>
+            </div>
+            <div class="track-dur">${fmtDur(r.duration)}</div>
+            <button class="dl-btn" onclick="dlTrack(this,'${encodeURIComponent(r.url)}','${encodeURIComponent(r.title)}')">⬇ DOWNLOAD</button>
+          </div>`).join('')}</div>`;
+      }
+    } catch(e) {
+      resultsEl.innerHTML = `<div class="state"><div class="state-icon">❌</div><div class="state-title">Error</div><div class="state-sub">${esc(e.message)}</div></div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔍 SEARCH';
+    }
+  }
+
+  function dlTrack(btn, encUrl, encTitle) {
+    btn.disabled = true;
+    btn.textContent = '⏳ ...';
+    const a = document.createElement('a');
+    a.href = `/api/download?url=${encUrl}&title=${encTitle}`;
+    a.download = `${decodeURIComponent(encTitle)}.mp3`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = '⬇ DOWNLOAD';
+    }, 3000);
+  }
+</script>
+</body>
+</html>
