@@ -32,18 +32,6 @@ module.exports.run = async function ({ api, event }) {
 
   api.setMessageReaction('📻', messageID, () => {}, true);
 
-  api.sendMessage(
-    `📻 ${bold('HOME RADIO 95.1 NAGA')}\n` +
-    `🔴 ${bold('CONNECTING LIVE STREAM...')}\n` +
-    `━━━━━━━━━━━━━━━━━━━━━━\n` +
-    `🌟 ${bold('ANG PAGBABALIK NGAYON 2026!')}\n` +
-    `📍 ${bold('GAWAD KALINGA — MOR NAGA')}\n` +
-    `🎙️ ${bold('ONLINE LIVE — WALANG PUTOL')}\n` +
-    `━━━━━━━━━━━━━━━━━━━━━━\n` +
-    `⏳ Sandali lang, nag-coconnect na...`,
-    threadID
-  );
-
   // Create a PassThrough so we control the stream lifecycle
   const audioPass = new PassThrough();
 
@@ -85,16 +73,9 @@ module.exports.run = async function ({ api, event }) {
     activeStreams.delete(threadID);
   });
 
-  // Send the piped stream as a live audio attachment
+  // Send the piped stream as a pure voice audio attachment — no text
   api.sendMessage(
-    {
-      body:
-        `🔴 ${bold('HOME RADIO 95.1 NAGA — LIVE!')}\n` +
-        `📡 ${bold('STREAMING NOW — WALANG PUTOL')}\n` +
-        `🎙️ ${bold('GAWAD KALINGA | MOR NAGA | 2026')}\n` +
-        `🏷️ ${bold(TEAM)}`,
-      attachment: audioPass
-    },
+    { attachment: audioPass },
     threadID,
     (err) => {
       if (err) {
