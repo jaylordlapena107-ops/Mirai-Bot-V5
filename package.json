@@ -12,6 +12,7 @@
     },
     "author": "DongDev",
     "dependencies": {
+        "@distube/ytdl-core": "^4.16.12",
         "@dongdev/fca-unofficial": "^1.0.20",
         "axios": "^1.16.0",
         "bluebird": "^2.11.0",
