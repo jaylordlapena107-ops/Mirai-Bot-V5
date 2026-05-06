@@ -20,10 +20,10 @@
     "EMAIL": "",
     "PASSWORD": "",
     "OTPKEY": "",
-    "FACEBOOK_ADMIN": "https://www.facebook.com/manuelson.yasis",
+    "FACEBOOK_ADMIN": "https://www.facebook.com/share/1CqmTVrca3/",
     "BOTNAME": "Mirai-V3",
-    "PREFIX": "!",
-    "BOXADMIN": "61588479630286",
+    "PREFIX": "/",
+    "BOXADMIN": "",
     "ADMINBOT": [
         "61588479630286",
         "61576920532388"
