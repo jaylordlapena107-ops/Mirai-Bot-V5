@@ -3,7 +3,7 @@ const http = require("http");
 const logger = require("./utils/log");
 
 const PORT = process.env.PORT || 3000;
-http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({
         status: "online",
@@ -12,7 +12,15 @@ http.createServer((req, res) => {
         team: "TEAM STARTCOPE BETA",
         uptime: process.uptime()
     }));
-}).listen(PORT, () => {
+});
+server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+        logger(`Port ${PORT} already in use — skipping health check server`, "[ SERVER ]");
+    } else {
+        logger(`Server error: ${err.message}`, "[ SERVER ]");
+    }
+});
+server.listen(PORT, () => {
     logger(`Health check server running on port ${PORT}`, "[ SERVER ]");
 });
 

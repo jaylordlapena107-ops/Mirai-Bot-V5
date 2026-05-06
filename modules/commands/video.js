@@ -9,6 +9,28 @@ const TEAM = "TEAM STARTCOPE BETA";
 const TEMP_DIR = path.join(process.cwd(), 'utils/data/video_temp');
 fs.ensureDirSync(TEMP_DIR);
 
+async function pollinate(messages, temperature = 0.8) {
+  for (let i = 0; i < 4; i++) {
+    try {
+      const res = await axios.post('https://text.pollinations.ai/', {
+        messages, model: 'openai', temperature
+      }, { headers: { 'Content-Type': 'application/json' }, timeout: 40000 });
+      const text = typeof res.data === 'string' ? res.data
+        : res.data?.choices?.[0]?.message?.content || res.data?.text || String(res.data);
+      if (!text || text.length < 2) throw new Error('Empty response from AI');
+      return text;
+    } catch (e) {
+      const is429 = e.response?.status === 429;
+      const isTimeout = e.code === 'ECONNABORTED' || e.message?.includes('timeout');
+      if ((is429 || isTimeout) && i < 3) {
+        await new Promise(r => setTimeout(r, (i + 1) * 4000 + Math.random() * 2000));
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
 async function getScenePlan(concept, count, isMovie) {
   const prompt = isMovie
     ? `Create a ${count}-scene Tagalog movie storyboard for: "${concept}".
@@ -27,15 +49,11 @@ SCENE 1
 IMAGE: [prompt]
 CAPTION: [caption]`;
 
-  const res = await axios.post('https://text.pollinations.ai/', {
-    messages: [
-      { role: 'system', content: 'You create concise visual storyboards. Strictly follow the format. No extra text.' },
-      { role: 'user', content: prompt }
-    ],
-    model: 'openai', temperature: 0.8
-  }, { headers: { 'Content-Type': 'application/json' }, timeout: 30000 });
+  const text = await pollinate([
+    { role: 'system', content: 'You create concise visual storyboards. Strictly follow the format. No extra text.' },
+    { role: 'user', content: prompt }
+  ], 0.8);
 
-  const text = typeof res.data === 'string' ? res.data : res.data?.choices?.[0]?.message?.content || '';
   const blocks = text.split(/SCENE\s+\d+/i).filter(b => b.trim());
   const scenes = blocks.map(b => {
     const img = (b.match(/IMAGE:\s*(.+)/i) || [])[1]?.trim();
@@ -55,10 +73,18 @@ CAPTION: [caption]`;
 async function genFrame(prompt, index) {
   const seed = Math.floor(Math.random() * 999999);
   const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt + ', cinematic, 16:9')}?width=1280&height=720&nologo=true&seed=${seed}`;
-  const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 90000 });
-  const fp = path.join(TEMP_DIR, `frame_${String(index).padStart(3, '0')}_${Date.now()}.jpg`);
-  await fs.writeFile(fp, Buffer.from(res.data));
-  return fp;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 90000 });
+      if (!res.data || res.data.byteLength < 500) throw new Error('Invalid frame response');
+      const fp = path.join(TEMP_DIR, `frame_${String(index).padStart(3, '0')}_${Date.now()}.jpg`);
+      await fs.writeFile(fp, Buffer.from(res.data));
+      return fp;
+    } catch (e) {
+      if (attempt < 2) { await new Promise(r => setTimeout(r, (attempt + 1) * 3000)); continue; }
+      throw e;
+    }
+  }
 }
 
 function buildVideo(framePaths, outputPath, secPerFrame = 4) {
