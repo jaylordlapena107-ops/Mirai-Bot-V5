@@ -1,53 +1,67 @@
-const axios = require('axios');
 const fs = require('fs-extra');
 const path = require('path');
 const { exec } = require('child_process');
-const ytdl = require('@distube/ytdl-core');
+const playdl = require('play-dl');
 const bold = require('../../utils/bold');
 
-const VERSION = '1.0.0';
+const VERSION = '2.0.0';
 const TEAM = 'TEAM STARTCOPE BETA';
 const TEMP_DIR = path.join(process.cwd(), 'utils/data/spotify_temp');
 fs.ensureDirSync(TEMP_DIR);
 
+let scReady = false;
+
+// Initialize SoundCloud client ID once on first use
+async function ensureSC() {
+  if (scReady) return;
+  const id = await playdl.getFreeClientID();
+  await playdl.setToken({ soundcloud: { client_id: id } });
+  scReady = true;
+}
+
 function cleanup(...files) {
-  setTimeout(() => files.forEach(f => fs.remove(f).catch(() => {})), 300000);
+  setTimeout(() => files.forEach(f => fs.remove(f).catch(() => {})), 600000);
 }
 
-// Search YouTube and return first video ID + title
-async function searchYouTube(query) {
-  const encoded = encodeURIComponent(query + ' official audio');
-  const res = await axios.get(`https://www.youtube.com/results?search_query=${encoded}&sp=EgIQAQ%3D%3D`, {
-    timeout: 20000,
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept-Language': 'en-US,en;q=0.9'
+function run(cmd) {
+  return new Promise((res, rej) =>
+    exec(cmd, { maxBuffer: 1024 * 1024 * 200 }, (e, _, se) =>
+      e ? rej(new Error(se?.slice(0, 300) || e.message)) : res()
+    )
+  );
+}
+
+async function searchAndDownload(query, rawPath) {
+  await ensureSC();
+
+  // Search SoundCloud
+  const results = await playdl.search(query, {
+    source: { soundcloud: 'tracks' },
+    limit: 5
+  });
+
+  if (!results.length) throw new Error('No results found for: ' + query);
+
+  // Try each result until one streams successfully
+  for (const track of results) {
+    try {
+      const stream = await playdl.stream(track.url);
+      await new Promise((res, rej) => {
+        const writer = fs.createWriteStream(rawPath);
+        stream.stream.pipe(writer);
+        writer.on('finish', res);
+        writer.on('error', rej);
+        stream.stream.on('error', rej);
+      });
+      const stat = await fs.stat(rawPath);
+      if (stat.size < 10000) throw new Error('File too small');
+      return { title: track.name, artist: track.user?.name || '', url: track.permalink_url || track.url };
+    } catch (e) {
+      await fs.remove(rawPath).catch(() => {});
+      continue;
     }
-  });
-
-  // Extract video IDs and titles from response
-  const videoIds = [...res.data.matchAll(/"videoId":"([^"]{11})"/g)].map(m => m[1]);
-  const titles   = [...res.data.matchAll(/"title":\{"runs":\[\{"text":"([^"]+)"/g)].map(m => m[1]);
-
-  if (!videoIds.length) throw new Error('No results found on YouTube');
-  return { videoId: videoIds[0], title: titles[0] || query };
-}
-
-// Download audio from YouTube video ID
-async function downloadAudio(videoId, outPath) {
-  const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const info = await ytdl.getInfo(url);
-  const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio', filter: 'audioonly' });
-  const title = info.videoDetails.title;
-
-  return new Promise((resolve, reject) => {
-    const stream = ytdl.downloadFromInfo(info, { format });
-    const writeStream = fs.createWriteStream(outPath);
-    stream.pipe(writeStream);
-    stream.on('error', reject);
-    writeStream.on('finish', () => resolve(title));
-    writeStream.on('error', reject);
-  });
+  }
+  throw new Error('Could not stream any result. Try a different search.');
 }
 
 module.exports.config = {
@@ -55,7 +69,7 @@ module.exports.config = {
   version: VERSION,
   hasPermssion: 0,
   credits: TEAM,
-  description: 'Search and send any song as audio — powered by YouTube (FREE)',
+  description: 'Search and send any song as audio — powered by SoundCloud (FREE)',
   commandCategory: 'Music',
   usages: '[song name / artist]',
   cooldowns: 20
@@ -79,7 +93,8 @@ module.exports.run = async function ({ api, event, args }) {
       `• ${P}spotify We Belong Together Mariah Carey\n` +
       `• ${P}spotify My Heart Will Go On Celine Dion\n` +
       `• ${P}spotify Ikaw lang OPM\n` +
-      `• ${P}spotify Shape of You Ed Sheeran\n\n` +
+      `• ${P}spotify Shape of You Ed Sheeran\n` +
+      `• ${P}spotify Kung Di Rin Lang Ikaw\n\n` +
       `📥 ${bold('Pwedeng i-download ang audio!')} 🎵`,
       threadID, messageID
     );
@@ -91,34 +106,30 @@ module.exports.run = async function ({ api, event, args }) {
   api.sendMessage(
     `🔍 ${bold('Hinahanap ang kanta...')}\n` +
     `🎵 ${bold('Search:')} ${query}\n` +
-    `⏳ ${bold('Please wait (15–30 seconds)...')}`,
+    `⏳ ${bold('Please wait (10–25 seconds)...')}`,
     threadID
   );
 
   const ts = Date.now();
-  const rawPath = path.join(TEMP_DIR, `raw_${ts}.webm`);
+  const rawPath = path.join(TEMP_DIR, `raw_${ts}`);
   const outPath = path.join(TEMP_DIR, `out_${ts}.mp3`);
 
   try {
-    // Step 1: Search YouTube
-    const { videoId, title } = await searchYouTube(query);
+    const { title, artist, url } = await searchAndDownload(query, rawPath);
 
-    // Step 2: Download audio
-    const realTitle = await downloadAudio(videoId, rawPath);
-
-    // Step 3: Convert to MP3 using ffmpeg
-    await new Promise((res, rej) =>
-      exec(`ffmpeg -y -i "${rawPath}" -vn -ar 44100 -ac 2 -b:a 128k "${outPath}"`,
-        { maxBuffer: 1024 * 1024 * 100 },
-        (e, _, se) => e ? rej(new Error(se?.slice(0, 200) || e.message)) : res()
-      )
-    );
+    // Convert raw stream to MP3
+    await run(`ffmpeg -y -i "${rawPath}" -vn -ar 44100 -ac 2 -b:a 128k "${outPath}"`);
     cleanup(rawPath);
 
     api.setMessageReaction('✅', messageID, () => {}, true);
 
     return api.sendMessage({
-      body: `🎧 ${bold('SPOTIFY')}\n🎵 ${bold(realTitle || title)}\n🔗 youtube.com/watch?v=${videoId}\n🏷️ ${bold(TEAM)}\n📥 Hold & save to download!`,
+      body:
+        `🎧 ${bold('SPOTIFY')} — ${bold('Found!')}\n` +
+        `🎵 ${bold(title)}\n` +
+        (artist ? `👤 ${bold(artist)}\n` : '') +
+        `🏷️ ${bold(TEAM)}\n` +
+        `📥 Hold & save to download!`,
       attachment: fs.createReadStream(outPath)
     }, threadID, () => cleanup(outPath));
 
