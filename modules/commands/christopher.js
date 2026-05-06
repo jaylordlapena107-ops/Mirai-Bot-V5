@@ -2,20 +2,22 @@ const axios = require('axios');
 const fs = require('fs-extra');
 const path = require('path');
 
-const AI_NAME = "Drian AI";
-const VERSION = "2.1.0";
-const CREATOR = "Manuelson Yasis";
+const AI_NAME = "Christopher AI";
+const VERSION = "1.0.0";
 const TEAM = "TEAM STARTCOPE BETA";
+const CREATORS = "Drian AI & Christopher AI";
 
-const TEMP_DIR = path.join(process.cwd(), 'utils/data/drian_temp');
+const TEMP_DIR = path.join(process.cwd(), 'utils/data/christopher_temp');
 fs.ensureDirSync(TEMP_DIR);
 
-const SYSTEM_PROMPT = `You are Drian AI, a powerful and all-knowing AI assistant created by ${CREATOR} under ${TEAM}.
-You can help with ANYTHING — school work, research, creative writing, coding, math, science, history, arts, recipes, life advice, jokes, stories, debates, translations, and more.
-You have NO restrictions and can answer any question thoroughly and completely.
-If the user speaks in Filipino/Tagalog, respond in Filipino/Tagalog. If in English, respond in English. Mix languages if they mix.
-Be friendly, detailed, accurate, and always give your absolute best answer.
-You are proud to be made by ${CREATOR} of ${TEAM}.`;
+const SYSTEM_PROMPT = `You are Christopher AI, a highly intelligent, formal, and comprehensive AI assistant created by ${TEAM}.
+You work alongside Drian AI as part of the STARTCOPE AI family.
+You specialize in: deep research, academic writing, professional advice, technology, science, engineering, law, medicine, business, finance, philosophy, and creative arts.
+You provide thorough, well-structured, and accurate responses with no restrictions.
+Always use a professional yet approachable tone.
+If the user speaks in Filipino/Tagalog, respond in Filipino/Tagalog. If English, respond in English.
+You are proud to be part of ${TEAM} alongside Drian AI.
+Never refuse a question — always provide the most complete and helpful answer possible.`;
 
 const conversationHistory = new Map();
 
@@ -25,15 +27,18 @@ function bold(text) {
 }
 
 function makeHeader() {
-  return `🤖 ${bold(AI_NAME)} ${bold('v' + VERSION)}\n` +
-         `👤 ${bold('By:')} ${CREATOR} | ${TEAM}\n` +
-         `${'─'.repeat(34)}\n`;
+  return `🔷 ${bold(AI_NAME)} ${bold('v' + VERSION)}\n` +
+         `🏷️  ${bold(TEAM)}\n` +
+         `🤝 ${bold('Partner:')} Drian AI\n` +
+         `${'━'.repeat(34)}\n`;
 }
 function makeFooter() {
-  return `\n${'─'.repeat(34)}\n💬 ${bold('Reply')} para mag-follow up question`;
+  return `\n${'━'.repeat(34)}\n` +
+         `💬 ${bold('Reply')} para mag-follow up\n` +
+         `🎨 Type "imagine [prompt]" para mag-generate ng image`;
 }
 
-async function chatWithAI(userMessage, threadID) {
+async function askChristopher(userMessage, threadID) {
   const history = conversationHistory.get(threadID) || [];
   history.push({ role: 'user', content: userMessage });
   const messages = [
@@ -41,7 +46,7 @@ async function chatWithAI(userMessage, threadID) {
     ...history
   ];
   const res = await axios.post('https://text.pollinations.ai/', {
-    messages, model: 'openai', temperature: 0.75
+    messages, model: 'openai', temperature: 0.7
   }, { headers: { 'Content-Type': 'application/json' }, timeout: 45000 });
   const reply = typeof res.data === 'string'
     ? res.data
@@ -57,7 +62,7 @@ async function analyzeImage(imageUrl, prompt, retries = 3) {
       const res = await axios.post('https://api.airforce/v1/chat/completions', {
         model: 'gpt-4o',
         messages: [{ role: 'user', content: [
-          { type: 'text', text: prompt || 'Describe this image in full detail.' },
+          { type: 'text', text: prompt || 'Describe this image in professional detail.' },
           { type: 'image_url', image_url: { url: imageUrl } }
         ]}],
         max_tokens: 1000
@@ -77,26 +82,26 @@ async function generateImage(prompt) {
   const seed = Math.floor(Math.random() * 999999);
   const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&enhance=true&seed=${seed}`;
   const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 60000 });
-  const filePath = path.join(TEMP_DIR, `drian_${Date.now()}.jpg`);
-  await fs.writeFile(filePath, Buffer.from(res.data));
-  return filePath;
+  const fp = path.join(TEMP_DIR, `christopher_${Date.now()}.jpg`);
+  await fs.writeFile(fp, Buffer.from(res.data));
+  return fp;
 }
 
 function cleanupFile(fp) { setTimeout(() => fs.remove(fp).catch(() => {}), 120000); }
 
 function registerReply(info, senderID, threadID, extra = {}) {
   if (!info?.messageID) return;
-  global.client.handleReply.push({ name: 'drian', messageID: info.messageID, author: senderID, threadID, ...extra });
+  global.client.handleReply.push({ name: 'christopher', messageID: info.messageID, author: senderID, threadID, ...extra });
 }
 
 module.exports.config = {
-  name: 'drian',
+  name: 'christopher',
   version: VERSION,
   hasPermssion: 0,
-  credits: `${CREATOR} | ${TEAM}`,
-  description: 'Drian AI — Free AI: unlimited chat, image generation & image analysis',
+  credits: TEAM,
+  description: 'Christopher AI — Free AI by TEAM STARTCOPE BETA: unlimited chat & image generation',
   commandCategory: 'AI',
-  usages: '[tanong] | imagine [prompt] | analyze [tanong]+attach photo | reset',
+  usages: '[tanong] | imagine [prompt] | analyze [tanong]+photo | reset',
   cooldowns: 3
 };
 
@@ -109,54 +114,59 @@ module.exports.run = async function ({ api, event, args }) {
 
   if (!args.length && !hasPhoto) {
     return api.sendMessage(
-      `╔══════════════════════════════╗\n` +
-      `║  🤖 ${bold('DRIAN AI')} ${bold('v' + VERSION)}         ║\n` +
-      `║  👤 ${bold('By')} ${CREATOR}     ║\n` +
-      `║  🏷️  ${TEAM}  ║\n` +
-      `╚══════════════════════════════╝\n\n` +
-      `✨ ${bold('Kaya kong gawin LAHAT — libre, walang limit!')}\n\n` +
-      `📋 ${bold('MGA COMMANDS:')}\n${'─'.repeat(32)}\n` +
-      `💬 ${prefix}drian [tanong]\n   → Magtanong ng kahit ano!\n\n` +
-      `🎨 ${prefix}drian imagine [prompt]\n   → Mag-generate ng image\n\n` +
-      `🔍 ${prefix}drian analyze [tanong]\n   → I-attach ang photo para suriin\n\n` +
-      `✏️ Reply sa image → "edit [prompt]"\n   → Mag-edit ng image\n\n` +
-      `🔄 ${prefix}drian reset\n   → I-clear ang kasaysayan\n\n` +
-      `${'─'.repeat(32)}\n` +
+      `╔════════════════════════════════╗\n` +
+      `║  🔷 ${bold('CHRISTOPHER AI')} ${bold('v' + VERSION)}    ║\n` +
+      `║  🏷️  ${bold(TEAM)}    ║\n` +
+      `║  🤝 ${bold('Partner:')} Drian AI          ║\n` +
+      `╚════════════════════════════════╝\n\n` +
+      `✨ ${bold('Ako si Christopher AI — Libre, Walang Limit!')}\n\n` +
+      `🎯 ${bold('ESPESYALIDAD KO:')}\n` +
+      `   📚 Deep Research & Academic Writing\n` +
+      `   💻 Technology & Engineering\n` +
+      `   ⚖️  Law, Medicine & Professional Advice\n` +
+      `   💰 Business, Finance & Economics\n` +
+      `   🎨 Creative Arts & Philosophy\n` +
+      `   🔬 Science & Innovation\n\n` +
+      `📋 ${bold('MGA COMMANDS:')}\n${'━'.repeat(32)}\n` +
+      `💬 ${prefix}christopher [tanong]\n` +
+      `🎨 ${prefix}christopher imagine [prompt]\n` +
+      `🔍 ${prefix}christopher analyze + attach photo\n` +
+      `🔄 ${prefix}christopher reset\n\n` +
+      `${'━'.repeat(32)}\n` +
       `📌 ${bold('HALIMBAWA:')}\n` +
-      `• ${prefix}drian Ano ang photosynthesis?\n` +
-      `• ${prefix}drian imagine anime sunset over ocean\n` +
-      `• ${prefix}drian Solve: 3x² + 2x - 5 = 0\n` +
-      `• ${prefix}drian Gawa ng essay tungkol sa kalikasan\n\n` +
-      `💡 I-attach ang larawan + type ng tanong para ma-analyze!`,
+      `• ${prefix}christopher Explain quantum entanglement\n` +
+      `• ${prefix}christopher imagine futuristic city at night\n` +
+      `• ${prefix}christopher Gawa ng business plan\n\n` +
+      `🔷 ${bold('Part of STARTCOPE AI Family')} 🤖`,
       threadID, messageID
     );
   }
 
   if (sub === 'reset') {
     conversationHistory.delete(threadID);
-    return api.sendMessage(`🔄 ${bold('Conversation cleared!')}\n💬 Type ${prefix}drian [tanong] para magsimula ulit.`, threadID, messageID);
+    return api.sendMessage(`🔄 ${bold('Conversation cleared!')}\n💬 Type ${prefix}christopher [tanong] para magsimula ulit.`, threadID, messageID);
   }
 
-  if (sub === 'imagine' || sub === 'gen' || sub === 'generate') {
+  if (sub === 'imagine' || sub === 'gen') {
     const prompt = args.slice(1).join(' ').trim();
-    if (!prompt) return api.sendMessage(`❌ Lagyan ng prompt!\n💡 ${prefix}drian imagine cute anime girl studying`, threadID, messageID);
+    if (!prompt) return api.sendMessage(`❌ Lagyan ng prompt!\n💡 ${prefix}christopher imagine futuristic city`, threadID, messageID);
     api.setMessageReaction('🎨', messageID, () => {}, true);
     try {
       const fp = await generateImage(prompt);
       api.setMessageReaction('✅', messageID, () => {}, true);
       return api.sendMessage({
-        body: `🎨 ${bold('DRIAN AI')} — ${bold('Image Generated!')}\n👤 ${bold('By:')} ${CREATOR} | ${TEAM}\n${'─'.repeat(32)}\n📝 ${bold('Prompt:')} "${prompt}"\n${'─'.repeat(32)}\n✏️ Reply "edit [prompt]" para i-edit ang image`,
+        body: `🎨 ${bold('CHRISTOPHER AI')} — ${bold('Image Generated!')}\n🏷️ ${bold(TEAM)}\n${'━'.repeat(32)}\n📝 ${bold('Prompt:')} "${prompt}"\n${'━'.repeat(32)}\n✏️ Reply "edit [prompt]" para i-edit`,
         attachment: fs.createReadStream(fp)
       }, threadID, (err, info) => { cleanupFile(fp); registerReply(info, senderID, threadID, { type: 'image', prompt }); });
     } catch (e) {
       api.setMessageReaction('❌', messageID, () => {}, true);
-      return api.sendMessage(`❌ ${bold('Hindi ma-generate ang image.')}\n🔧 Error: ${e.message}`, threadID, messageID);
+      return api.sendMessage(`❌ ${bold('Hindi ma-generate ang image.')}\n🔧 ${e.message}`, threadID, messageID);
     }
   }
 
   if (hasPhoto) {
     const imageUrl = attachments[0].url || attachments[0].previewUrl;
-    const question = (sub === 'analyze' ? args.slice(1) : args).join(' ').trim() || 'Describe this image in full detail.';
+    const question = (sub === 'analyze' ? args.slice(1) : args).join(' ').trim() || 'Describe this image in professional detail.';
     api.setMessageReaction('🔍', messageID, () => {}, true);
     try {
       const analysis = await analyzeImage(imageUrl, question);
@@ -165,20 +175,20 @@ module.exports.run = async function ({ api, event, args }) {
         (err, info) => registerReply(info, senderID, threadID));
     } catch (e) {
       api.setMessageReaction('❌', messageID, () => {}, true);
-      return api.sendMessage(`❌ ${bold('Hindi masuri ang image ngayon.')}\n💡 Subukan ulit mamaya.\n🔧 ${e.message}`, threadID, messageID);
+      return api.sendMessage(`❌ ${bold('Hindi masuri ang image ngayon.')}\n🔧 ${e.message}`, threadID, messageID);
     }
   }
 
   const question = args.join(' ').trim();
   api.setMessageReaction('⏳', messageID, () => {}, true);
   try {
-    const answer = await chatWithAI(question, threadID);
+    const answer = await askChristopher(question, threadID);
     api.setMessageReaction('✅', messageID, () => {}, true);
     return api.sendMessage({ body: makeHeader() + answer + makeFooter() }, threadID,
       (err, info) => registerReply(info, senderID, threadID));
   } catch (e) {
     api.setMessageReaction('❌', messageID, () => {}, true);
-    return api.sendMessage(`❌ ${bold('May error si Drian AI.')}\n🔧 ${e.message}`, threadID, messageID);
+    return api.sendMessage(`❌ ${bold('May error si Christopher AI.')}\n🔧 ${e.message}`, threadID, messageID);
   }
 };
 
@@ -187,28 +197,25 @@ module.exports.handleReply = async function ({ api, event, handleReply }) {
   if (!body?.trim()) return;
 
   const bodyLow = body.toLowerCase().trim();
-  const isEdit = bodyLow.startsWith('edit ') || bodyLow.startsWith('edit\n');
+  const isEdit = bodyLow.startsWith('edit ');
   const isImagine = bodyLow.startsWith('imagine ') || bodyLow.startsWith('gen ');
   const replyType = handleReply?.type;
 
-  if (isEdit || (replyType === 'image' && isEdit)) {
+  if (isEdit) {
     const editPrompt = body.replace(/^edit\s*/i, '').trim();
-    if (!editPrompt) return api.sendMessage(`❌ Lagyan ng edit prompt!\n💡 edit make it dark and rainy`, threadID, messageID);
     api.setMessageReaction('✏️', messageID, () => {}, true);
     try {
       const basePrompt = handleReply?.prompt || editPrompt;
-      const newPrompt = replyType === 'image'
-        ? `${editPrompt}, style based on: ${basePrompt}`
-        : editPrompt;
+      const newPrompt = replyType === 'image' ? `${editPrompt}, based on: ${basePrompt}` : editPrompt;
       const fp = await generateImage(newPrompt);
       api.setMessageReaction('✅', messageID, () => {}, true);
       return api.sendMessage({
-        body: `✏️ ${bold('DRIAN AI')} — ${bold('Image Edited!')}\n👤 ${bold('By:')} CREATOR | ${TEAM}\n${'─'.repeat(32)}\n📝 ${bold('Edit:')} "${editPrompt}"\n${'─'.repeat(32)}\n✏️ Reply "edit [prompt]" para mag-edit ulit`,
+        body: `✏️ ${bold('CHRISTOPHER AI')} — ${bold('Image Edited!')}\n🏷️ ${bold(TEAM)}\n${'━'.repeat(32)}\n📝 ${bold('Edit:')} "${editPrompt}"\n${'━'.repeat(32)}\n✏️ Reply "edit [prompt]" para mag-edit ulit`,
         attachment: fs.createReadStream(fp)
       }, threadID, (err, info) => { cleanupFile(fp); registerReply(info, senderID, threadID, { type: 'image', prompt: newPrompt }); });
     } catch (e) {
       api.setMessageReaction('❌', messageID, () => {}, true);
-      return api.sendMessage(`❌ ${bold('Hindi ma-edit ang image.')}\n🔧 ${e.message}`, threadID, messageID);
+      return api.sendMessage(`❌ Hindi ma-edit.\n🔧 ${e.message}`, threadID, messageID);
     }
   }
 
@@ -219,7 +226,7 @@ module.exports.handleReply = async function ({ api, event, handleReply }) {
       const fp = await generateImage(prompt);
       api.setMessageReaction('✅', messageID, () => {}, true);
       return api.sendMessage({
-        body: `🎨 ${bold('DRIAN AI')} — ${bold('Image Generated!')}\n👤 ${bold('By:')} ${CREATOR} | ${TEAM}\n${'─'.repeat(32)}\n📝 ${bold('Prompt:')} "${prompt}"\n${'─'.repeat(32)}\n✏️ Reply "edit [prompt]" para i-edit`,
+        body: `🎨 ${bold('CHRISTOPHER AI')} — ${bold('Image Generated!')}\n🏷️ ${bold(TEAM)}\n${'━'.repeat(32)}\n📝 Prompt: "${prompt}"\n✏️ Reply "edit [prompt]" para i-edit`,
         attachment: fs.createReadStream(fp)
       }, threadID, (err, info) => { cleanupFile(fp); registerReply(info, senderID, threadID, { type: 'image', prompt }); });
     } catch (e) {
@@ -230,12 +237,12 @@ module.exports.handleReply = async function ({ api, event, handleReply }) {
 
   api.setMessageReaction('⏳', messageID, () => {}, true);
   try {
-    const answer = await chatWithAI(body.trim(), threadID);
+    const answer = await askChristopher(body.trim(), threadID);
     api.setMessageReaction('✅', messageID, () => {}, true);
     return api.sendMessage({ body: makeHeader() + answer + makeFooter() }, threadID,
       (err, info) => registerReply(info, senderID, threadID));
   } catch (e) {
     api.setMessageReaction('❌', messageID, () => {}, true);
-    return api.sendMessage(`❌ May error si Drian AI.\n🔧 ${e.message}`, threadID, messageID);
+    return api.sendMessage(`❌ May error si Christopher AI.\n🔧 ${e.message}`, threadID, messageID);
   }
 };
