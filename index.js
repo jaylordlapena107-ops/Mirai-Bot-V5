@@ -8,6 +8,47 @@ const logger = require("./utils/log");
 const PORT = process.env.PORT || 5000;
 const WEB_DIR = path.join(__dirname, "web");
 
+// ── Detect serverless platforms (can only serve web, not run bot) ─────────────
+const IS_VERCEL   = !!process.env.VERCEL;
+const IS_NETLIFY  = !!process.env.NETLIFY;
+const IS_SERVERLESS = IS_VERCEL || IS_NETLIFY;
+
+// ── SoundCloud client_id — initialized once, shared across all requests ───────
+let scReady = false;
+async function ensureSC() {
+  if (scReady) return;
+  try {
+    const play = require("play-dl");
+    const id = await play.getFreeClientID();
+    await play.setToken({ soundcloud: { client_id: id } });
+    scReady = true;
+    console.log("[SC] SoundCloud client_id initialized:", id.slice(0, 8) + "...");
+  } catch (e) {
+    console.error("[SC] Failed to get client_id:", e.message);
+  }
+}
+// Pre-initialize on startup so first search is fast
+ensureSC();
+
+// ── APPSTATE from environment variable (for cloud hosting) ───────────────────
+// On Render/Railway/etc set env var APPSTATE = <contents of appstate.json>
+function writeAppstateFromEnv() {
+  const raw = process.env.APPSTATE;
+  if (!raw) return;
+  const dest = path.join(__dirname, "appstate.json");
+  if (fs.existsSync(dest)) return; // already present, don't overwrite
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error("APPSTATE must be a JSON array");
+    fs.writeFileSync(dest, JSON.stringify(parsed, null, 2));
+    console.log("[APPSTATE] Written from environment variable ✅");
+  } catch (e) {
+    console.error("[APPSTATE] Invalid APPSTATE env var:", e.message);
+  }
+}
+writeAppstateFromEnv();
+
+// ── Web request handler ───────────────────────────────────────────────────────
 async function handleRequest(req, res) {
   const parsed = url.parse(req.url, true);
   const pathname = parsed.pathname;
@@ -22,45 +63,38 @@ async function handleRequest(req, res) {
     return res.end();
   }
 
-  // ── GET / → serve music search web UI ──────────────────────────────────────
+  // ── GET / → MIRAI music search UI ─────────────────────────────────────────
   if (pathname === "/" || pathname === "/index.html") {
     try {
       const html = fs.readFileSync(path.join(WEB_DIR, "index.html"), "utf8");
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       return res.end(html);
-    } catch (e) {
+    } catch {
       res.writeHead(404, { "Content-Type": "text/plain" });
-      return res.end("Page not found");
+      return res.end("Not found");
     }
   }
 
-  // ── GET /api/search?q=... → SoundCloud search ───────────────────────────────
+  // ── GET /api/search?q=... → SoundCloud search ──────────────────────────────
   if (pathname === "/api/search") {
     const q = query.q;
     if (!q) {
       res.writeHead(400, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ error: "Missing query" }));
+      return res.end(JSON.stringify({ error: "Missing query parameter q" }));
     }
     try {
+      await ensureSC();
       const play = require("play-dl");
       const results = await play.search(q, {
         source: { soundcloud: "tracks" },
         limit: 10,
       });
       const mapped = results.map((r) => ({
-        title: r.name || r.title || "Unknown",
-        url: r.url,
-        duration: r.durationInSec || 0,
-        thumbnail:
-          r.thumbnails?.[0]?.url ||
-          r.thumbnail?.url ||
-          r.thumbnails?.[0] ||
-          "",
-        artist:
-          r.user?.name ||
-          r.publisher?.name ||
-          r.channel?.name ||
-          "Unknown Artist",
+        title:     r.name || r.title || "Unknown",
+        url:       r.url,
+        duration:  r.durationInSec || 0,
+        thumbnail: r.thumbnails?.[0]?.url || r.thumbnail?.url || r.thumbnails?.[0] || "",
+        artist:    r.user?.name || r.publisher?.name || r.channel?.name || "Unknown Artist",
       }));
       res.writeHead(200, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ results: mapped }));
@@ -71,7 +105,7 @@ async function handleRequest(req, res) {
     }
   }
 
-  // ── GET /api/download?url=...&title=... → stream MP3 ───────────────────────
+  // ── GET /api/download?url=...&title=... → stream MP3 ──────────────────────
   if (pathname === "/api/download") {
     const trackUrl = query.url;
     const title = (query.title || "audio").replace(/[^\w\s\-]/g, "").trim();
@@ -80,6 +114,7 @@ async function handleRequest(req, res) {
       return res.end("Missing url");
     }
     try {
+      await ensureSC();
       const play = require("play-dl");
       const info = await play.stream(trackUrl);
       res.writeHead(200, {
@@ -88,9 +123,7 @@ async function handleRequest(req, res) {
         "Transfer-Encoding": "chunked",
       });
       info.stream.pipe(res);
-      req.on("close", () => {
-        try { info.stream.destroy(); } catch {}
-      });
+      req.on("close", () => { try { info.stream.destroy(); } catch {} });
     } catch (e) {
       console.error("[Download API]", e.message);
       if (!res.headersSent) {
@@ -101,21 +134,21 @@ async function handleRequest(req, res) {
     return;
   }
 
-  // ── GET /health → JSON status ───────────────────────────────────────────────
+  // ── GET /health → status JSON ──────────────────────────────────────────────
   if (pathname === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(
-      JSON.stringify({
-        status: "online",
-        bot: "Mirai Bot V3",
-        version: "3.0.0",
-        team: "TEAM STARTCOPE BETA",
-        uptime: process.uptime(),
-      })
-    );
+    return res.end(JSON.stringify({
+      status:   "online",
+      bot:      "Mirai Bot V3",
+      version:  "3.0.0",
+      team:     "TEAM STARTCOPE BETA",
+      platform: IS_SERVERLESS ? (IS_VERCEL ? "vercel" : "netlify") : "persistent",
+      botMode:  IS_SERVERLESS ? "web-only" : "bot+web",
+      uptime:   process.uptime(),
+    }));
   }
 
-  // ── 404 ─────────────────────────────────────────────────────────────────────
+  // ── 404 ───────────────────────────────────────────────────────────────────
   res.writeHead(404, { "Content-Type": "text/plain" });
   res.end("Not found");
 }
@@ -137,10 +170,14 @@ server.on("error", (err) => {
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   logger(`Web UI running on port ${PORT}`, "[ SERVER ]");
+  if (IS_SERVERLESS) {
+    logger(`Serverless mode — web UI only (no bot)`, "[ SERVER ]");
+  }
 });
 
+// ── Bot process — only on persistent platforms (not Vercel/Netlify) ──────────
 function startBot(message) {
   if (message) logger(message, "[ Starting ]");
   const child = spawn(
@@ -159,4 +196,8 @@ function startBot(message) {
   });
 }
 
-startBot();
+if (!IS_SERVERLESS) {
+  startBot();
+} else {
+  logger("Serverless platform detected — bot messaging disabled. Web UI active.", "[ INFO ]");
+}

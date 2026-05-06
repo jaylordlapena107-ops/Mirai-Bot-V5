@@ -75,23 +75,58 @@ global.getText = function (...args) {
 };
 
 function loadAppState() {
+  // ── Priority 1: APPSTATE environment variable (for cloud hosting) ──────────
+  // On Render/Railway/Heroku: set env var APPSTATE = <contents of appstate.json>
+  if (process.env.APPSTATE) {
+    try {
+      const appState = JSON.parse(process.env.APPSTATE);
+      if (Array.isArray(appState) && appState.length > 0) {
+        logger('APPSTATE env var found — using it to login', '[ LOGIN ] >');
+        // Write to disk so the API can refresh/save it
+        try { writeFileSync('./appstate.json', JSON.stringify(appState, null, 2)); } catch {}
+        return { appState };
+      }
+    } catch (e) {
+      logger('Invalid APPSTATE env var: ' + e.message, '[ LOGIN ] >');
+    }
+  }
+
+  // ── Priority 2: COOKIE environment variable ─────────────────────────────────
+  if (process.env.FB_COOKIE) {
+    try {
+      logger('FB_COOKIE env var found — using it to login', '[ LOGIN ] >');
+      const cookies = global.utils.parseCookies(process.env.FB_COOKIE);
+      return { appState: cookies };
+    } catch (e) {
+      logger('Invalid FB_COOKIE env var: ' + e.message, '[ LOGIN ] >');
+    }
+  }
+
+  // ── Priority 3: appstate.json file ─────────────────────────────────────────
   if (existsSync('./appstate.json')) {
     try {
       const appState = JSON.parse(readFileSync('./appstate.json', 'utf8'));
       if (Array.isArray(appState) && appState.length > 0) {
-        logger('Found appstate.json - using it to login', '[ LOGIN ] >');
+        logger('Found appstate.json — using it to login', '[ LOGIN ] >');
         return { appState };
       }
     } catch (e) {
       logger('Failed to parse appstate.json: ' + e.message, '[ LOGIN ] >');
     }
   }
+
+  // ── Priority 4: cookie.txt file ─────────────────────────────────────────────
   if (existsSync('./cookie.txt')) {
-    logger('Found cookie.txt - using it to login', '[ LOGIN ] >');
+    logger('Found cookie.txt — using it to login', '[ LOGIN ] >');
     const cookies = global.utils.parseCookies(readFileSync('./cookie.txt', 'utf8'));
     return { appState: cookies };
   }
-  throw new Error('No login credentials found. Please provide appstate.json or cookie.txt');
+
+  throw new Error(
+    'No login credentials found!\n' +
+    '  On Render/Railway: set env var APPSTATE = <your appstate.json contents>\n' +
+    '  Locally: add appstate.json or cookie.txt to the project root'
+  );
 }
 
 function onBot({ models }) {

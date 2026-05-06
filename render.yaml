@@ -1,7 +1,16 @@
 services:
   - type: worker
-    name: mirai-bot
+    name: mirai-bot-v3
     env: node
+    region: singapore
+    plan: free
     buildCommand: npm install
     startCommand: node index.js
     autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: APPSTATE
+        sync: false   # Set this in Render dashboard: paste your appstate.json contents here
