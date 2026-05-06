@@ -11,9 +11,10 @@ const axios    = require('axios');
 const { exec } = require('child_process');
 const bold     = require('../../utils/bold');
 
-const VERSION  = '2.0.0';
-const TEAM     = 'TEAM STARTCOPE BETA';
-const INTERVAL = 4 * 60 * 1000; // 4 minutes — 24/7 walang tigil
+const VERSION        = '3.0.0';
+const TEAM           = 'TEAM STARTCOPE BETA';
+const NEWS_INTERVAL  = 10 * 60 * 1000; // 10 minutes — text/image news
+const VIDEO_INTERVAL =  4 * 60 * 1000; // 4 minutes  — video news
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 const DATA_DIR   = path.join(process.cwd(), 'utils/data');
@@ -253,47 +254,46 @@ async function downloadNewsVideo(headline) {
   }
 }
 
-// ── Global timer + cycle ──────────────────────────────────────────────────────
-let globalTimer = null;
-let globalApi   = null;
-let cycleCount  = 0;
+// ── Shared state ──────────────────────────────────────────────────────────────
+let newsTimer  = null;
+let videoTimer = null;
+let globalApi  = null;
 
-async function runCycle() {
+// ── Shared helpers ─────────────────────────────────────────────────────────────
+function saveAppstate(api) {
+  try {
+    const appState = api.getAppState();
+    if (appState && Array.isArray(appState)) {
+      fs.writeFileSync('./appstate.json', JSON.stringify(appState, null, 2));
+      fs.writeFileSync('./utils/data/fbstate.json', JSON.stringify(appState, null, 2));
+    }
+  } catch {}
+}
+
+function handlePostError(e, timerRef, cycleFn) {
+  const msg = (e.message || '').toLowerCase();
+  if (msg.includes('checkpoint') || msg.includes('restricted') || msg.includes('suspended') || msg.includes('disabled')) {
+    console.error(`[AutoMOR] 🔒 RESTRICTION DETECTED — backing off 30 min:`, msg.slice(0, 80));
+    if (global.protection?.clearCheckpoint) global.protection.clearCheckpoint(globalApi);
+    return setTimeout(cycleFn, 30 * 60 * 1000 + Math.random() * 5 * 60 * 1000);
+  }
+  console.error(`[AutoMOR] ❌ error:`, (e.message || 'unknown').slice(0, 120));
+  state.errorCount = (state.errorCount || 0) + 1;
+  const backoff = Math.min(state.errorCount * 3 * 60 * 1000, 20 * 60 * 1000);
+  console.log(`[AutoMOR] ⏳ backoff: ${Math.round(backoff / 60000)} min`);
+  return setTimeout(cycleFn, backoff);
+}
+
+// ── NEWS CYCLE — every 10 minutes ─────────────────────────────────────────────
+async function runNewsCycle() {
   if (!state.enabled || !globalApi) return;
-
-  cycleCount++;
-  const doVideo = (cycleCount % 4 === 0);
-
   try {
     const news = await getNextNews();
     if (!news) {
-      console.log(`[AutoMOR] No fresh news — skipping`);
-      scheduleNext();
-      return;
-    }
-
-    const newsId = news.id || news.link;
-    markSeen(newsId);
-
-    if (doVideo) {
-      // Text post first (fast)
-      const text = composeNewsPost(news, true);
-      await doCreatePost(globalApi, text);
-      console.log(`[AutoMOR #${state.count + 1}] 📰 Text posted — downloading video...`);
-
-      // Then try video
-      const video = await downloadNewsVideo(news.title);
-      if (video) {
-        const vidBody =
-          `🎬 ${bold('VIDEO NEWS:')} ${bold(news.title)}\n` +
-          `📅 ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}\n` +
-          `🏷️ ${bold(TEAM)} 🇵🇭`;
-        await doCreatePost(globalApi, vidBody, fs.createReadStream(video.path));
-        setTimeout(() => { try { fs.removeSync(video.path); } catch {} }, 300000);
-        console.log(`[AutoMOR] 🎬 Video posted: ${video.title?.slice(0, 60)}`);
-      }
+      console.log('[AutoMOR:News] No fresh news — skipping');
     } else {
-      // Text only post (with thumbnail if available)
+      const newsId = news.id || news.link;
+      markSeen(newsId);
       const text = composeNewsPost(news);
 
       if (news.thumb && news.thumb.startsWith('http')) {
@@ -304,78 +304,98 @@ async function runCycle() {
           await doCreatePost(globalApi, text, fs.createReadStream(imgPath));
           setTimeout(() => { try { fs.removeSync(imgPath); } catch {} }, 60000);
         } catch {
-          // Thumbnail failed — post text only
           await doCreatePost(globalApi, text);
         }
       } else {
         await doCreatePost(globalApi, text);
       }
-    }
 
-    state.count++;
-    state.lastPostedAt = new Date().toISOString();
-    persist();
-
-    console.log(`[AutoMOR #${state.count}] ✅ Posted to Facebook wall: ${news.title?.slice(0, 60)}`);
-
-    // Save fresh appstate after every post (keeps session fresh)
-    try {
-      const appState = globalApi.getAppState();
-      if (appState && Array.isArray(appState)) {
-        fs.writeFileSync('./appstate.json', JSON.stringify(appState, null, 2));
-        fs.writeFileSync('./utils/data/fbstate.json', JSON.stringify(appState, null, 2));
-      }
-    } catch {}
-
-    // Clear any checkpoint warning proactively
-    if (global.protection?.clearCheckpoint) global.protection.clearCheckpoint(globalApi);
-
-  } catch (e) {
-    const msg = e.message?.toLowerCase() || '';
-    // Checkpoint/restriction — long backoff
-    if (msg.includes('checkpoint') || msg.includes('restricted') || msg.includes('suspended') || msg.includes('disabled')) {
-      console.error(`[AutoMOR] 🔒 RESTRICTION DETECTED — backing off 30 min:`, e.message?.slice(0, 100));
+      state.count++;
+      state.lastPostedAt = new Date().toISOString();
+      persist();
+      saveAppstate(globalApi);
       if (global.protection?.clearCheckpoint) global.protection.clearCheckpoint(globalApi);
-      globalTimer = setTimeout(runCycle, 30 * 60 * 1000 + Math.random() * 5 * 60 * 1000);
-      return;
+      console.log(`[AutoMOR:News #${state.count}] ✅ ${news.title?.slice(0, 60)}`);
     }
-    console.error(`[AutoMOR] ❌ createPost error:`, e.message?.slice(0, 120));
-    // Exponential backoff on errors
-    state.errorCount = (state.errorCount || 0) + 1;
-    const backoff = Math.min(state.errorCount * 3 * 60 * 1000, 20 * 60 * 1000);
-    console.log(`[AutoMOR] ⏳ Error backoff: ${Math.round(backoff / 60000)} min`);
-    globalTimer = setTimeout(runCycle, backoff);
+
+    state.errorCount = 0;
+  } catch (e) {
+    newsTimer = handlePostError(e, newsTimer, runNewsCycle);
     return;
   }
 
-  state.errorCount = 0;
-  scheduleNext();
+  // Schedule next news post — 10 min ± 60–90 sec jitter
+  const jitter = (Math.random() - 0.5) * 2 * (60000 + Math.random() * 30000);
+  newsTimer = setTimeout(runNewsCycle, NEWS_INTERVAL + jitter);
 }
 
-function scheduleNext() {
-  if (globalTimer) { clearTimeout(globalTimer); globalTimer = null; }
-  if (!state.enabled) return;
-  // 4 min ± 30–90 sec random jitter (harder to detect fixed pattern)
-  const jitter = (Math.random() - 0.5) * 2 * (30000 + Math.random() * 60000);
-  const delay  = INTERVAL + jitter;
-  globalTimer  = setTimeout(runCycle, delay);
+// ── VIDEO CYCLE — every 4 minutes ─────────────────────────────────────────────
+async function runVideoCycle() {
+  if (!state.enabled || !globalApi) return;
+  try {
+    const news = await getNextNews();
+    if (!news) {
+      console.log('[AutoMOR:Video] No fresh news for video — skipping');
+    } else {
+      const newsId = `video_${news.id || news.link}`;
+      markSeen(newsId);
+
+      // Post text teaser first (instant)
+      const teaser = composeNewsPost(news, true);
+      await doCreatePost(globalApi, teaser);
+      console.log(`[AutoMOR:Video] 📰 Teaser posted — downloading video...`);
+
+      // Then download and post video
+      const video = await downloadNewsVideo(news.title);
+      if (video) {
+        const vidBody =
+          `🎬 ${bold('VIDEO NEWS:')} ${bold(news.title)}\n` +
+          `📅 ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}\n` +
+          `🏷️ ${bold(TEAM)} 🇵🇭`;
+        await doCreatePost(globalApi, vidBody, fs.createReadStream(video.path));
+        // Keep video file alive for 5 min then clean up
+        setTimeout(() => { try { fs.removeSync(video.path); } catch {} }, 300000);
+        console.log(`[AutoMOR:Video] 🎬 Video posted: ${video.title?.slice(0, 60)}`);
+      } else {
+        console.log('[AutoMOR:Video] ⚠️ No video found — text teaser only');
+      }
+
+      saveAppstate(globalApi);
+      if (global.protection?.clearCheckpoint) global.protection.clearCheckpoint(globalApi);
+    }
+
+    state.errorCount = 0;
+  } catch (e) {
+    videoTimer = handlePostError(e, videoTimer, runVideoCycle);
+    return;
+  }
+
+  // Schedule next video — 4 min ± 30–60 sec jitter
+  const jitter = (Math.random() - 0.5) * 2 * (30000 + Math.random() * 30000);
+  videoTimer = setTimeout(runVideoCycle, VIDEO_INTERVAL + jitter);
 }
 
 function startAutoMor(api) {
   globalApi     = api;
   state.enabled = true;
   persist();
-  // First post in 30–60 sec
-  const first = 30000 + Math.random() * 30000;
-  globalTimer  = setTimeout(runCycle, first);
-  console.log(`[AutoMOR] ✅ Started — first post in ${Math.round(first / 1000)}s`);
+
+  // Stagger starts: news first (30–45 sec), video after (90–120 sec)
+  const newsDelay  = 30000 + Math.random() * 15000;
+  const videoDelay = 90000 + Math.random() * 30000;
+  newsTimer  = setTimeout(runNewsCycle,  newsDelay);
+  videoTimer = setTimeout(runVideoCycle, videoDelay);
+
+  console.log(`[AutoMOR] ✅ Started — 📰 news every 10min | 🎬 video every 4min`);
+  console.log(`[AutoMOR] ⏱️ First news in ${Math.round(newsDelay / 1000)}s, first video in ${Math.round(videoDelay / 1000)}s`);
 }
 
 function stopAutoMor() {
-  if (globalTimer) { clearTimeout(globalTimer); globalTimer = null; }
+  if (newsTimer)  { clearTimeout(newsTimer);  newsTimer  = null; }
+  if (videoTimer) { clearTimeout(videoTimer); videoTimer = null; }
   state.enabled = false;
   persist();
-  console.log(`[AutoMOR] 🛑 Stopped`);
+  console.log(`[AutoMOR] 🛑 Stopped (news + video timers cleared)`);
 }
 
 // ── Command exports ───────────────────────────────────────────────────────────
@@ -384,7 +404,7 @@ module.exports.config = {
   version:         VERSION,
   hasPermssion:    2,
   credits:         TEAM,
-  description:     'Auto-posts live PH news to Facebook WALL every 4 minutes, 24/7 (PhilStar, Rappler, USGS)',
+  description:     'Auto-posts PH news (text every 10min + video every 4min) to Facebook WALL 24/7',
   commandCategory: 'Admin',
   usages:          '[on | off | status]',
   cooldowns:       5
@@ -394,8 +414,8 @@ module.exports.onLoad = function ({ api }) {
   loadPersistedState();
   if (state.enabled) {
     globalApi = api;
-    console.log(`[AutoMOR] 🔄 Restored — was ON, resuming...`);
-    setTimeout(scheduleNext, 10000);
+    console.log(`[AutoMOR] 🔄 Restored — resuming dual-cycle (news 10min + video 4min)...`);
+    setTimeout(() => startAutoMor(api), 10000);
   }
 };
 
@@ -412,12 +432,13 @@ module.exports.run = async function ({ api, event, args }) {
       `╚═══════════════════════════════╝\n\n` +
       `🇵🇭 ${bold('LIVE PHILIPPINE NEWS — 24/7 NON-STOP!')}\n` +
       `🖼️ ${bold('Posts to: Facebook WALL/TIMELINE')}\n` +
-      `⏱️ ${bold('Every 4 minutes — walang tigil!')}\n\n` +
+      `📰 ${bold('News cycle:')} Every 10 minutes (text + thumbnail)\n` +
+      `🎬 ${bold('Video cycle:')} Every 4 minutes (teaser + video)\n\n` +
       `📡 ${bold('SOURCES (FREE, no API key):')}\n` +
       `  📰 PhilStar — Headlines, Nation, Sports, Business\n` +
       `  📡 Rappler — PH News\n` +
       `  🌋 USGS — Real-time PH Earthquakes\n` +
-      `  🎬 YouTube — Video news (every 4th post)\n\n` +
+      `  🎬 yt-dlp — Live video news\n\n` +
       `📋 ${bold('COMMANDS:')}\n${'─'.repeat(32)}\n` +
       `${P}automor on      — I-start\n` +
       `${P}automor off     — I-stop\n` +
@@ -438,16 +459,17 @@ module.exports.run = async function ({ api, event, args }) {
     startAutoMor(api);
     return api.sendMessage(
       `✅ ${bold('AUTOMOR NEWS — STARTED! 🇵🇭')}\n\n` +
-      `📰 ${bold('Live Philippines News')}\n` +
-      `🖼️ ${bold('Posts to: Facebook WALL/TIMELINE')}\n` +
-      `⏱️ ${bold('Every 4 minutes, 24/7 — walang tigil!')}\n\n` +
+      `📰 ${bold('Live Philippines News — DUAL CYCLE!')}\n` +
+      `🖼️ ${bold('Posts to: Facebook WALL/TIMELINE')}\n\n` +
+      `📰 ${bold('News Cycle:')} Every 10 min — text + thumbnail\n` +
+      `🎬 ${bold('Video Cycle:')} Every 4 min — teaser + video\n\n` +
       `📡 ${bold('Sources:')}\n` +
       `  • PhilStar (Headlines, Nation, Sports, Business)\n` +
       `  • Rappler PH News\n` +
       `  • USGS Real-time Earthquakes 🌋\n` +
-      `  • YouTube Video News 🎬\n\n` +
+      `  • yt-dlp Video News 🎬\n\n` +
       `📌 ${bold('Hindi paulit-ulit!')} Nag-ta-track ng seen news.\n` +
-      `🕒 ${bold('First post in 30–60 seconds...')}\n\n` +
+      `🕒 ${bold('News in ~35sec | Video in ~105sec...')}\n\n` +
       `💡 I-stop: ${P}automor off\n🏷️ ${bold(TEAM)}`,
       threadID, messageID
     );
