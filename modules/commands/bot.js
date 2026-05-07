@@ -1,8 +1,6 @@
 const axios = require("axios");
 const { getData, setData } = require("../../database.js");
 
-const bold = (text) => text;
-
 // ── CONFIG ─────────────────────────────────────────────
 const AI_NAME = "BARKADA AI";
 const VERSION = "1.0.0";
@@ -17,22 +15,6 @@ const SYSTEM_PROMPT =
 
 // ── MEMORY ─────────────────────────────────────────────
 const history = new Map();
-
-// ── HEADER / FOOTER ────────────────────────────────────
-function makeHeader() {
-  return (
-    `╔════════════════════════════╗\n` +
-    `║ 🤖 ${AI_NAME} v${VERSION} ║\n` +
-    `╚════════════════════════════╝\n`
-  );
-}
-
-function makeFooter() {
-  return (
-    `\n━━━━━━━━━━━━━━━━━━\n` +
-    `💬 Reply para mag follow-up`
-  );
-}
 
 // ── BOT STATUS ─────────────────────────────────────────
 async function getBotStatus(threadID) {
@@ -144,7 +126,7 @@ module.exports.handleEvent = async function ({
     let trigger = false;
 
     // trigger words
-    if (/\b(bot|jandel)\b/i.test(body)) {
+    if (/\b(bot|jandel|barkada)\b/i.test(body)) {
       trigger = true;
     }
 
@@ -161,7 +143,7 @@ module.exports.handleEvent = async function ({
 
     // clean text
     let cleaned = body
-      .replace(/\b(bot|jandel)\b/gi, "")
+      .replace(/\b(bot|jandel|barkada)\b/gi, "")
       .trim();
 
     if (!cleaned) {
@@ -203,11 +185,9 @@ module.exports.handleEvent = async function ({
     );
 
     const finalReply =
-      makeHeader() +
-      `💬 SAGOT\n` +
+      `${answer} 🤖\n\n` +
       `━━━━━━━━━━━━━━━━━━\n` +
-      `${answer} 🤖` +
-      makeFooter();
+      `💬 Reply this message para mag chat ulit`;
 
     return api.sendMessage(
       finalReply,
@@ -230,9 +210,7 @@ module.exports.run = async function ({
 
   if (!args[0]) {
     return api.sendMessage(
-      `╔════════════════════╗\n` +
-      `║ 🤖 ${AI_NAME} ║\n` +
-      `╚════════════════════╝\n\n` +
+      `🤖 ${AI_NAME}\n\n` +
       `📌 /bot on — enable AI\n` +
       `📌 /bot off — disable AI\n` +
       `📌 /bot status — check status`,
