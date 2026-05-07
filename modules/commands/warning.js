@@ -65,9 +65,7 @@ function pickRandom(arr) {
 async function getUserName(uid, api) {
   try {
     const info = await api.getUserInfo(uid);
-
     return info[uid]?.name || "User";
-
   } catch {
     return "User";
   }
@@ -77,7 +75,7 @@ async function getUserName(uid, api) {
 function formatWarning(name, type, note, count) {
   return (
     `╔══════════════════╗\n` +
-    `║ ⚠️ ${bold("WARNING")} \n` +
+    `║ ⚠️ ${bold("WARNING")}\n` +
     `╚══════════════════╝\n\n` +
     `👤 User: ${name}\n` +
     `🚫 Violation: ${type}\n` +
@@ -89,7 +87,7 @@ function formatWarning(name, type, note, count) {
 // ── MODULE CONFIG ──────────────────────────────────────
 module.exports.config = {
   name: "warning",
-  version: "1.0.0",
+  version: "1.0.1",
   hasPermssion: 1,
   credits: "ChatGPT + AI",
   description: "Auto warning system",
@@ -99,7 +97,7 @@ module.exports.config = {
 };
 
 // ── COMMANDS ───────────────────────────────────────────
-module.exports.run = async function({
+module.exports.run = async function ({
   api,
   event,
   args
@@ -198,7 +196,7 @@ module.exports.run = async function({
 };
 
 // ── AUTO DETECT ────────────────────────────────────────
-module.exports.handleEvent = async function({
+module.exports.handleEvent = async function ({
   api,
   event
 }) {
@@ -213,6 +211,15 @@ module.exports.handleEvent = async function({
     } = event;
 
     if (!body) return;
+
+    // ── IGNORE BOT ITSELF ──────────────────────────────
+    if (senderID == api.getCurrentUserID()) return;
+
+    // ── IGNORE BOT ADMINS ──────────────────────────────
+    if (
+      global.config.ADMINBOT &&
+      global.config.ADMINBOT.includes(senderID)
+    ) return;
 
     const text =
       body.toLowerCase();
@@ -277,7 +284,7 @@ module.exports.handleEvent = async function({
       };
     }
 
-    // reset after 24h
+    // ── RESET AFTER 24 HOURS ───────────────────────────
     if (
       Date.now() - warnings.lastUpdated >=
       24 * 60 * 60 * 1000
@@ -293,7 +300,7 @@ module.exports.handleEvent = async function({
       warnings
     );
 
-    // track users
+    // ── TRACK USERS ────────────────────────────────────
     let all =
       await getData(`warnings/${threadID}/_all`) || [];
 
@@ -374,7 +381,7 @@ module.exports.handleEvent = async function({
         body: msg,
         mentions: [
           {
-            tag: name,
+            tag: `@${name}`,
             id: senderID
           },
           ...mentions
@@ -396,10 +403,16 @@ module.exports.handleEvent = async function({
         );
 
         await api.sendMessage(
-          `⛔ @${name} has been removed from the group.`,
-          threadID,
-          null,
-          messageID
+          {
+            body: `⛔ @${name} has been removed from the group.`,
+            mentions: [
+              {
+                tag: `@${name}`,
+                id: senderID
+              }
+            ]
+          },
+          threadID
         );
 
         await setData(
