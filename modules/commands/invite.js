@@ -2,7 +2,7 @@ const { getData, setData } = require("../../database.js");
 
 module.exports.config = {
   name: "invite",
-  version: "1.0.0",
+  version: "2.0.0",
   hasPermssion: 1,
   credits: "ChatGPT",
   description: "Track member invitations",
@@ -11,10 +11,53 @@ module.exports.config = {
   cooldowns: 3
 };
 
-// ── SAVE LAST MEMBERS ─────────────────────────────
-const memberCache = new Map();
+// ── GET MONEY ─────────────────────────────
+async function getMoney(uid) {
 
-// ── HANDLE JOIN EVENT ────────────────────────────
+  let data =
+    await getData(`bank/${uid}`);
+
+  if (!data)
+    data = {};
+
+  return data.money || 0;
+}
+
+// ── SET MONEY ─────────────────────────────
+async function setMoney(uid, amount) {
+
+  let data =
+    await getData(`bank/${uid}`);
+
+  if (!data)
+    data = {};
+
+  data.money = amount;
+
+  await setData(
+    `bank/${uid}`,
+    data
+  );
+}
+
+// ── ADD MONEY ─────────────────────────────
+async function addMoney(uid, amount) {
+
+  const current =
+    await getMoney(uid);
+
+  const updated =
+    current + amount;
+
+  await setMoney(
+    uid,
+    updated
+  );
+
+  return updated;
+}
+
+// ── HANDLE JOIN EVENT ─────────────────────
 module.exports.handleEvent = async function ({
   api,
   event,
@@ -23,7 +66,6 @@ module.exports.handleEvent = async function ({
 
   try {
 
-    // detect member add
     if (
       event.logMessageType !==
       "log:subscribe"
@@ -35,16 +77,21 @@ module.exports.handleEvent = async function ({
       logMessageData
     } = event;
 
-    // ignore bot added
     const addedUsers =
-      logMessageData.addedParticipants || [];
+      logMessageData
+      .addedParticipants || [];
 
     const botID =
-      String(api.getCurrentUserID());
+      String(
+        api.getCurrentUserID()
+      );
 
+    // ignore if bot added
     const isBotAdded =
       addedUsers.some(
-        u => String(u.userFbId) === botID
+        u =>
+          String(u.userFbId)
+          === botID
       );
 
     if (isBotAdded)
@@ -55,9 +102,11 @@ module.exports.handleEvent = async function ({
       String(author);
 
     const inviterName =
-      await Users.getNameUser(inviterID);
+      await Users.getNameUser(
+        inviterID
+      );
 
-    // get database
+    // get invite database
     let data =
       await getData(
         `inviteSystem/${threadID}`
@@ -66,7 +115,7 @@ module.exports.handleEvent = async function ({
     if (!data)
       data = {};
 
-    // init inviter
+    // init
     if (!data[inviterID]) {
 
       data[inviterID] = {
@@ -74,43 +123,60 @@ module.exports.handleEvent = async function ({
       };
     }
 
-    // add invites
+    // add invite count
     data[inviterID].count +=
       addedUsers.length;
 
-    // save
+    // save invite data
     await setData(
       `inviteSystem/${threadID}`,
       data
     );
 
+    // ── MONEY REWARD ─────────────────
+
+    const reward =
+      50 * addedUsers.length;
+
+    const totalBalance =
+      await addMoney(
+        inviterID,
+        reward
+      );
+
     // total invites
     const totalInvites =
       data[inviterID].count;
 
-    // names added
+    // names
     let addedText = "";
 
     for (const user of addedUsers) {
 
       addedText +=
-        `👤 ${user.fullName}\n`;
+`👤 ${user.fullName}
+`;
     }
 
     // send message
     return api.sendMessage(
 
-`━━━━━━━━━━━━━━━
-🎉 MEMBER INVITED
-
+`╭───────────────⭓
+│ 🎉 MEMBER INVITED
+├───────────────⭔
 ${addedText}
-📨 Invited By:
-${inviterName}
-
-🏆 Total Invited:
-${totalInvites}
-
-━━━━━━━━━━━━━━━`,
+│ 📨 Invited By:
+│ ${inviterName}
+│
+│ 🏆 Total Invited:
+│ ${totalInvites}
+│
+│ 💸 Reward:
+│ +${reward} Money
+│
+│ 🏦 Total Balance:
+│ ${totalBalance}
+╰───────────────⭓`,
 
       threadID
     );
@@ -125,7 +191,7 @@ ${totalInvites}
   }
 };
 
-// ── COMMANDS ─────────────────────────────────────
+// ── COMMANDS ─────────────────────────────
 module.exports.run = async function ({
   api,
   event,
@@ -144,7 +210,7 @@ module.exports.run = async function ({
       (args[0] || "")
       .toLowerCase();
 
-    // ── TOP INVITERS ─────────────────────────
+    // ── TOP ──────────────────────────
     if (option === "top") {
 
       let data =
@@ -164,23 +230,28 @@ module.exports.run = async function ({
         )
         .slice(0, 10);
 
-      if (sorted.length === 0) {
+      if (
+        sorted.length === 0
+      ) {
 
         return api.sendMessage(
-`━━━━━━━━━━━━━━━
-📊 INVITE LEADERBOARD
 
-No invite data yet.
-━━━━━━━━━━━━━━━`,
+`╭───────────────⭓
+│ 📊 INVITE TOP
+├───────────────⭔
+│ No invite data yet.
+╰───────────────⭓`,
+
           threadID,
           messageID
         );
       }
 
       let msg =
-`━━━━━━━━━━━━━━━
-🏆 INVITE LEADERBOARD
 
+`╭───────────────⭓
+│ 🏆 TOP INVITERS
+├───────────────⭔
 `;
 
       let i = 1;
@@ -191,19 +262,22 @@ No invite data yet.
       ] of sorted) {
 
         const name =
-          await Users.getNameUser(uid);
+          await Users.getNameUser(
+            uid
+          );
 
         msg +=
-`${i}. ${name}
-📨 ${info.count} invites
 
+`│ ${i}. ${name}
+│ 📨 ${info.count} invites
+│
 `;
 
         i++;
       }
 
       msg +=
-`━━━━━━━━━━━━━━━`;
+`╰───────────────⭓`;
 
       return api.sendMessage(
         msg,
@@ -212,7 +286,7 @@ No invite data yet.
       );
     }
 
-    // ── RESET ───────────────────────────────
+    // ── RESET ────────────────────────
     if (option === "reset") {
 
       await setData(
@@ -221,27 +295,30 @@ No invite data yet.
       );
 
       return api.sendMessage(
-`━━━━━━━━━━━━━━━
-🗑️ INVITE DATA RESET
-━━━━━━━━━━━━━━━`,
+
+`╭───────────────⭓
+│ 🗑️ INVITE RESET
+├───────────────⭔
+│ Invite data cleared.
+╰───────────────⭓`,
+
         threadID,
         messageID
       );
     }
 
-    // ── DEFAULT ─────────────────────────────
+    // ── DEFAULT ──────────────────────
     return api.sendMessage(
 
-`━━━━━━━━━━━━━━━
-📨 INVITE SYSTEM
-
-📌 /invite top
-View top inviters
-
-📌 /invite reset
-Reset invite data
-
-━━━━━━━━━━━━━━━`,
+`╭───────────────⭓
+│ 📨 INVITE SYSTEM
+├───────────────⭔
+│ 📌 /invite top
+│ View leaderboard
+│
+│ 📌 /invite reset
+│ Reset invite data
+╰───────────────⭓`,
 
       threadID,
       messageID
