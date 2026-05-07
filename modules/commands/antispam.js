@@ -5,7 +5,7 @@ const {
 
 module.exports.config = {
   name: "antispam",
-  version: "3.0.0",
+  version: "4.0.0",
   credits: "ChatGPT",
   description:
     "Anti spam system with warning + auto kick",
@@ -13,7 +13,10 @@ module.exports.config = {
     "/antispam on | off",
   commandCategory:
     "moderation",
-  cooldowns: 3
+  cooldowns: 3,
+
+  // IMPORTANT
+  handleEvent: true
 };
 
 // ── SPAM TRACKER ─────────────────────
@@ -42,13 +45,8 @@ async function ({
     .toLowerCase();
 
   // ── OWNER BYPASS ──────────────────
-  if (senderID == ownerID) {
+  if (senderID != ownerID) {
 
-    // owner can use directly
-
-  } else {
-
-    // ── GET ADMIN INFO ──────────────
     let isAdmin = false;
 
     try {
@@ -65,10 +63,7 @@ async function ({
 
     } catch (e) {
 
-      console.log(
-        "THREAD INFO ERROR:",
-        e
-      );
+      console.log(e);
 
       return api.sendMessage(
 
@@ -77,8 +72,6 @@ async function ({
 ├───────────────⭔
 │ Cannot get
 │ group info.
-│
-│ Try again later.
 ╰───────────────⭓`,
 
         threadID,
@@ -104,7 +97,7 @@ async function ({
     }
   }
 
-  // ── INVALID ───────────────────────
+  // ── INVALID USAGE ─────────────────
   if (
     sub !== "on" &&
     sub !== "off"
@@ -115,7 +108,7 @@ async function ({
 `╭───────────────⭓
 │ 🛡️ ANTISPAM
 ├───────────────⭔
-│ 📌 Usage:
+│ Usage:
 │ /antispam on
 │ /antispam off
 ╰───────────────⭓`,
@@ -169,15 +162,23 @@ async function ({
       body
     } = event;
 
+    // ── DEBUG ───────────────────────
+    console.log(
+      "MESSAGE:",
+      senderID,
+      body
+    );
+
     if (!body)
       return;
 
-    // ── OWNER + BOT BYPASS ─────────
+    // ── BOT ID ──────────────────────
     const botID =
       String(
         api.getCurrentUserID()
       );
 
+    // ── BYPASS ──────────────────────
     if (
       senderID == ownerID ||
       senderID == botID
@@ -197,7 +198,7 @@ async function ({
     if (!data.enabled)
       return;
 
-    // ── INIT TRACKER ────────────────
+    // ── INIT THREAD ─────────────────
     if (
       !spamTracker[threadID]
     ) {
@@ -207,6 +208,7 @@ async function ({
       ] = {};
     }
 
+    // ── INIT USER ───────────────────
     if (
       !spamTracker[
         threadID
@@ -249,8 +251,13 @@ async function ({
         now;
     }
 
-    // ── COUNT EVERY MESSAGE ─────────
+    // ── ADD COUNT ───────────────────
     user.count++;
+
+    console.log(
+      `SPAM COUNT ${senderID}:`,
+      user.count
+    );
 
     // ── WARNING ─────────────────────
     if (
@@ -274,7 +281,7 @@ async function ({
 │ ${senderID}
 │
 │ Stop spamming.
-│ Next offense
+│ Next spam
 │ = auto kick.
 ╰───────────────⭓`,
 
@@ -315,6 +322,11 @@ async function ({
         );
 
       } catch (e) {
+
+        console.log(
+          "KICK ERROR:",
+          e
+        );
 
         return api.sendMessage(
 
