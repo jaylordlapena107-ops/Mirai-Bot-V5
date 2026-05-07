@@ -20,7 +20,8 @@ module.exports.handleEvent = async function ({
   event,
   api,
   client,
-  Users
+  Users,
+  Threads
 }) {
 
   const request =
@@ -31,10 +32,7 @@ module.exports.handleEvent = async function ({
 
   const {
     writeFileSync,
-    createReadStream,
-    unlinkSync,
-    existsSync,
-    mkdirSync
+    createReadStream
   } = global.nodemodule["fs-extra"];
 
   let {
@@ -51,6 +49,7 @@ module.exports.handleEvent = async function ({
     global.data.botID =
       api.getCurrentUserID();
 
+  // thread settings
   const thread =
     global.data.threadData.get(
       parseInt(threadID)
@@ -69,16 +68,7 @@ module.exports.handleEvent = async function ({
     global.data.botID
   ) return;
 
-  // create cache folder
-  const cachePath =
-    __dirname + `/cache`;
-
-  if (!existsSync(cachePath))
-    mkdirSync(cachePath, {
-      recursive: true
-    });
-
-  // save messages
+  // save message
   if (
     event.type !=
     "message_unsend"
@@ -87,16 +77,16 @@ module.exports.handleEvent = async function ({
     global.logMessage.set(
       messageID,
       {
-        msgBody: content || "",
+        msgBody:
+          content || "",
+
         attachment:
           event.attachments || [],
       }
     );
-
-    return;
   }
 
-  // unsend detect
+  // detect unsend
   if (
     event.type ==
     "message_unsend"
@@ -117,9 +107,8 @@ module.exports.handleEvent = async function ({
 
     // no attachment
     if (
-      !getMsg.attachment ||
-      getMsg.attachment.length ==
-        0
+      getMsg.attachment[0] ==
+      undefined
     ) {
 
       return api.sendMessage(
@@ -139,6 +128,7 @@ ${getMsg.msgBody || "No text"}`,
       let num = 0;
 
       let msg = {
+
         body:
 `🚨 MESSAGE UNSENT
 
@@ -150,10 +140,13 @@ ${getMsg.attachment.length}
 💬 Content:
 ${getMsg.msgBody || "No text"}`,
 
-        attachment: []
-      };
+        attachment: [],
 
-      let removeFiles = [];
+        mentions: [{
+          tag: name,
+          id: senderID
+        }]
+      };
 
       for (var i of getMsg.attachment) {
 
@@ -161,24 +154,18 @@ ${getMsg.msgBody || "No text"}`,
 
           num += 1;
 
-          let ext = "jpg";
+          var getURL =
+            await request.get(
+              i.url
+            );
 
-          if (
-            i.type == "video"
-          ) ext = "mp4";
+          var pathname =
+            getURL.uri.pathname;
 
-          else if (
-            i.type == "audio"
-          ) ext = "mp3";
-
-          else if (
-            i.type ==
-            "animated_image"
-          ) ext = "gif";
-
-          else if (
-            i.type == "photo"
-          ) ext = "jpg";
+          var ext =
+            pathname.substring(
+              pathname.lastIndexOf(".") + 1
+            );
 
           var path =
             __dirname +
@@ -197,10 +184,11 @@ ${getMsg.msgBody || "No text"}`,
 
           writeFileSync(
             path,
-            Buffer.from(data)
+            Buffer.from(
+              data,
+              "utf-8"
+            )
           );
-
-          removeFiles.push(path);
 
           msg.attachment.push(
             createReadStream(path)
@@ -208,27 +196,13 @@ ${getMsg.msgBody || "No text"}`,
 
         } catch (e) {
 
-          console.log(
-            "[RESEND ERROR]",
-            e.message
-          );
+          console.log(e);
         }
       }
 
-      return api.sendMessage(
+      api.sendMessage(
         msg,
-        threadID,
-        () => {
-
-          for (const file of removeFiles) {
-
-            try {
-
-              unlinkSync(file);
-
-            } catch (e) {}
-          }
-        }
+        threadID
       );
     }
   }
