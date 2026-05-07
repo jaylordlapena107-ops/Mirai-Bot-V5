@@ -4,10 +4,10 @@ const moment = require("moment-timezone");
 
 module.exports.config = {
   name: "resend",
-  version: "5.0.0",
+  version: "6.0.0",
   hasPermssion: 1,
   credits: "Thọ & Mod By DuyVuong + ChatGPT",
-  description: "Resend unsent messages with attachment save",
+  description: "Anti unsend with attachment support",
   usePrefix: true,
   commandCategory: "utility",
   usages: "resend",
@@ -30,7 +30,6 @@ module.exports.handleEvent = async function ({
     senderID,
     threadID,
     body,
-    attachments,
     type
   } = event;
 
@@ -40,7 +39,7 @@ module.exports.handleEvent = async function ({
   if (!global.data.botID)
     global.data.botID = api.getCurrentUserID();
 
-  // ignore bot messages
+  // ignore bot
   if (senderID == global.data.botID)
     return;
 
@@ -75,18 +74,32 @@ module.exports.handleEvent = async function ({
 
     let savedAttachments = [];
 
-    if (
-      attachments &&
-      attachments.length > 0
-    ) {
+    try {
+
+      const msgInfo =
+        await api.getMessageInfo(
+          messageID,
+          threadID
+        );
+
+      const atts =
+        msgInfo.attachments || [];
 
       let num = 0;
 
-      for (const att of attachments) {
+      for (const att of atts) {
 
         try {
 
           num++;
+
+          const url =
+            att.largePreviewUrl ||
+            att.previewUrl ||
+            att.url;
+
+          if (!url)
+            continue;
 
           let ext = "jpg";
 
@@ -115,7 +128,7 @@ module.exports.handleEvent = async function ({
 
           const data =
             (
-              await axios.get(att.url, {
+              await axios.get(url, {
                 responseType: "arraybuffer"
               })
             ).data;
@@ -130,11 +143,18 @@ module.exports.handleEvent = async function ({
         } catch (e) {
 
           console.log(
-            "[RESEND SAVE ERROR]",
+            "[ATTACHMENT SAVE ERROR]",
             e.message
           );
         }
       }
+
+    } catch (e) {
+
+      console.log(
+        "[MESSAGE INFO ERROR]",
+        e.message
+      );
     }
 
     global.logMessage.set(messageID, {
@@ -219,7 +239,7 @@ ${unsentTime}`,
     } catch (e) {
 
       console.log(
-        "[RESEND READ ERROR]",
+        "[ATTACHMENT READ ERROR]",
         e.message
       );
     }
