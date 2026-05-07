@@ -1,259 +1,237 @@
-const fs = require("fs-extra");
-const axios = require("axios");
-const moment = require("moment-timezone");
-
 module.exports.config = {
   name: "resend",
-  version: "7.0.0",
+  version: "2.1.0",
   hasPermssion: 1,
-  credits: "Thọ & Mod By DuyVuong + ChatGPT",
-  description: "Anti unsend with image/video support",
+  credits: "Thọ & Mod By DuyVuong + Edited",
+  description: "Resends Messages",
   usePrefix: true,
-  commandCategory: "utility",
+  commandCategory: "general",
   usages: "resend",
   cooldowns: 0,
+  hide: true,
   dependencies: {
+    request: "",
     "fs-extra": "",
-    axios: "",
-    "moment-timezone": ""
-  }
+    axios: ""
+  },
 };
 
 module.exports.handleEvent = async function ({
   event,
   api,
-  Threads
+  client,
+  Users
 }) {
 
+  const request =
+    global.nodemodule["request"];
+
+  const axios =
+    global.nodemodule["axios"];
+
   const {
+    writeFileSync,
+    createReadStream,
+    unlinkSync,
+    existsSync,
+    mkdirSync
+  } = global.nodemodule["fs-extra"];
+
+  let {
     messageID,
     senderID,
     threadID,
-    body,
-    type,
-    attachments
+    body: content
   } = event;
 
   if (!global.logMessage)
     global.logMessage = new Map();
 
   if (!global.data.botID)
-    global.data.botID = api.getCurrentUserID();
+    global.data.botID =
+      api.getCurrentUserID();
+
+  const thread =
+    global.data.threadData.get(
+      parseInt(threadID)
+    ) || {};
+
+  // resend off
+  if (
+    typeof thread["resend"] !=
+      "undefined" &&
+    thread["resend"] == false
+  ) return;
 
   // ignore bot
-  if (senderID == global.data.botID)
-    return;
+  if (
+    senderID ==
+    global.data.botID
+  ) return;
 
-  // resend status
-  const threadData =
-    (await Threads.getData(threadID)).data || {};
+  // create cache folder
+  const cachePath =
+    __dirname + `/cache`;
 
-  if (threadData.resend === false)
-    return;
+  if (!existsSync(cachePath))
+    mkdirSync(cachePath, {
+      recursive: true
+    });
 
-  // get sender name
-  let senderName =
-    global.data.userName.get(senderID);
+  // save messages
+  if (
+    event.type !=
+    "message_unsend"
+  ) {
 
-  if (!senderName) {
-
-    const userInfo =
-      await api.getUserInfo(senderID);
-
-    senderName =
-      Object.values(userInfo)[0]?.name ||
-      "Friend";
-
-    global.data.userName.set(
-      senderID,
-      senderName
+    global.logMessage.set(
+      messageID,
+      {
+        msgBody: content || "",
+        attachment:
+          event.attachments || [],
+      }
     );
+
+    return;
   }
 
-  // SAVE NORMAL MESSAGE
-  if (type !== "message_unsend") {
+  // unsend detect
+  if (
+    event.type ==
+    "message_unsend"
+  ) {
 
-    let savedAttachments = [];
+    var getMsg =
+      global.logMessage.get(
+        messageID
+      );
 
-    // save attachment instantly
+    if (!getMsg)
+      return;
+
+    let name =
+      await Users.getNameUser(
+        senderID
+      );
+
+    // no attachment
     if (
-      attachments &&
-      attachments.length > 0
+      !getMsg.attachment ||
+      getMsg.attachment.length ==
+        0
     ) {
+
+      return api.sendMessage(
+`🚨 MESSAGE UNSENT
+
+👤 Name: ${name}
+
+💬 Content:
+${getMsg.msgBody || "No text"}`,
+        threadID
+      );
+    }
+
+    // with attachment
+    else {
 
       let num = 0;
 
-      for (const att of attachments) {
+      let msg = {
+        body:
+`🚨 MESSAGE UNSENT
+
+👤 Name: ${name}
+
+📎 Attachments:
+${getMsg.attachment.length}
+
+💬 Content:
+${getMsg.msgBody || "No text"}`,
+
+        attachment: []
+      };
+
+      let removeFiles = [];
+
+      for (var i of getMsg.attachment) {
 
         try {
 
-          console.log(
-            "[ATTACHMENT]",
-            att
-          );
-
-          num++;
-
-          const url =
-            att.playableUrl ||
-            att.largePreviewUrl ||
-            att.previewUrl ||
-            att.url;
-
-          if (!url)
-            continue;
+          num += 1;
 
           let ext = "jpg";
 
-          if (att.type === "photo")
-            ext = "jpg";
-
-          else if (att.type === "video")
-            ext = "mp4";
-
-          else if (att.type === "audio")
-            ext = "mp3";
+          if (
+            i.type == "video"
+          ) ext = "mp4";
 
           else if (
-            att.type === "animated_image"
-          )
-            ext = "gif";
+            i.type == "audio"
+          ) ext = "mp3";
 
           else if (
-            att.type === "file"
-          )
-            ext = "bin";
+            i.type ==
+            "animated_image"
+          ) ext = "gif";
 
-          const pathFile =
+          else if (
+            i.type == "photo"
+          ) ext = "jpg";
+
+          var path =
             __dirname +
-            `/cache/${messageID}_${num}.${ext}`;
+            `/cache/${Date.now()}_${num}.${ext}`;
 
-          const data =
+          var data =
             (
-              await axios.get(url, {
-                responseType: "arraybuffer"
-              })
+              await axios.get(
+                i.url,
+                {
+                  responseType:
+                    "arraybuffer"
+                }
+              )
             ).data;
 
-          fs.writeFileSync(
-            pathFile,
+          writeFileSync(
+            path,
             Buffer.from(data)
           );
 
-          savedAttachments.push(
-            pathFile
-          );
+          removeFiles.push(path);
 
-          console.log(
-            "[ATTACHMENT SAVED]",
-            pathFile
+          msg.attachment.push(
+            createReadStream(path)
           );
 
         } catch (e) {
 
           console.log(
-            "[SAVE ERROR]",
+            "[RESEND ERROR]",
             e.message
           );
         }
       }
-    }
 
-    // save message
-    global.logMessage.set(messageID, {
+      return api.sendMessage(
+        msg,
+        threadID,
+        () => {
 
-      msgBody:
-        body || "No text",
+          for (const file of removeFiles) {
 
-      attachment:
-        savedAttachments,
+            try {
 
-      senderName,
+              unlinkSync(file);
 
-      senderID,
-
-      timeSent:
-        moment()
-          .tz("Asia/Manila")
-          .format(
-            "hh:mm A | MMM DD YYYY"
-          )
-    });
-
-    return;
-  }
-
-  // DETECT UNSEND
-  const getMsg =
-    global.logMessage.get(messageID);
-
-  if (!getMsg)
-    return;
-
-  const unsentTime =
-    moment()
-      .tz("Asia/Manila")
-      .format(
-        "hh:mm A | MMM DD YYYY"
-      );
-
-  let msg = {
-
-    body:
-`🚨 MESSAGE UNSENT
-
-👤 Name: ${getMsg.senderName}
-
-💬 Message:
-${getMsg.msgBody}
-
-📎 Attachments:
-${getMsg.attachment.length}
-
-⏰ Sent:
-${getMsg.timeSent}
-
-🗑️ Unsent:
-${unsentTime}`,
-
-    attachment: [],
-
-    mentions: [{
-      tag: getMsg.senderName,
-      id: getMsg.senderID,
-      fromIndex: 0
-    }]
-  };
-
-  // attach saved files
-  for (const filePath of getMsg.attachment) {
-
-    try {
-
-      if (
-        fs.existsSync(filePath)
-      ) {
-
-        msg.attachment.push(
-          fs.createReadStream(filePath)
-        );
-      }
-
-    } catch (e) {
-
-      console.log(
-        "[READ ERROR]",
-        e.message
+            } catch (e) {}
+          }
+        }
       );
     }
   }
-
-  return api.sendMessage(
-    msg,
-    threadID,
-    null,
-    messageID
-  );
 };
 
 module.exports.run = async function ({
@@ -267,21 +245,24 @@ module.exports.run = async function ({
     messageID
   } = event;
 
-  const data =
-    (await Threads.getData(threadID))
-      .data || {};
+  var data =
+    (
+      await Threads.getData(
+        threadID
+      )
+    ).data;
 
   if (
-    typeof data.resend ===
+    typeof data["resend"] ==
       "undefined" ||
-    data.resend === false
+    data["resend"] == false
   )
 
-    data.resend = true;
+    data["resend"] = true;
 
   else
 
-    data.resend = false;
+    data["resend"] = false;
 
   await Threads.setData(
     parseInt(threadID),
@@ -295,7 +276,7 @@ module.exports.run = async function ({
 
   return api.sendMessage(
     `Resend is now ${
-      data.resend
+      data["resend"] == true
         ? "ON ✅"
         : "OFF ❌"
     }`,
