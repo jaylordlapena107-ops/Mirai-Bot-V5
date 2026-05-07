@@ -1,24 +1,27 @@
-const { setData, getData } = require("../../database.js");
+const {
+  getData,
+  setData
+} = require("../../database.js");
 
 module.exports.config = {
   name: "antispam",
   version: "2.0.0",
   credits: "ChatGPT",
-  description: "Anti spam system with warning and auto kick",
-  usages: "/antispam on | off",
-  commandCategory: "moderation",
-  cooldowns: 3,
+  description:
+    "Anti spam system with warning + auto kick",
+  usages:
+    "/antispam on | off",
+  commandCategory:
+    "moderation",
+  cooldowns: 3
 };
 
-// ── SPAM TRACKER ─────────────────────────
-let spamTracker = {};
+// ── SPAM TRACKER ─────────────────────
+const spamTracker = {};
 
-// SETTINGS
-const SPAM_LIMIT = 5; // 5 messages
-const SPAM_TIME = 10000; // 10 seconds
-
-// ── COMMAND ─────────────────────────────
-module.exports.run = async function ({
+// ── COMMAND ──────────────────────────
+module.exports.run =
+async function ({
   api,
   event,
   args
@@ -34,17 +37,45 @@ module.exports.run = async function ({
     (args[0] || "")
     .toLowerCase();
 
-  // admin check
-  const info =
-    await api.getThreadInfo(
-      threadID
+  // ── GET ADMIN INFO ────────────────
+  let isAdmin = false;
+
+  try {
+
+    const info =
+      await api.getThreadInfo(
+        threadID
+      );
+
+    isAdmin =
+      info.adminIDs.some(
+        a => a.id == senderID
+      );
+
+  } catch (e) {
+
+    console.log(
+      "THREAD INFO ERROR:",
+      e
     );
 
-  const isAdmin =
-    info.adminIDs.some(
-      a => a.id == senderID
-    );
+    return api.sendMessage(
 
+`╭───────────────⭓
+│ ❌ FAILED
+├───────────────⭔
+│ Cannot get
+│ group info.
+│
+│ Try again later.
+╰───────────────⭓`,
+
+      threadID,
+      messageID
+    );
+  }
+
+  // ── ADMIN CHECK ───────────────────
   if (!isAdmin) {
 
     return api.sendMessage(
@@ -61,7 +92,7 @@ module.exports.run = async function ({
     );
   }
 
-  // invalid
+  // ── INVALID ───────────────────────
   if (
     sub !== "on" &&
     sub !== "off"
@@ -70,7 +101,7 @@ module.exports.run = async function ({
     return api.sendMessage(
 
 `╭───────────────⭓
-│ 🛡️ ANTI SPAM
+│ 🛡️ ANTISPAM
 ├───────────────⭔
 │ 📌 Usage:
 │ /antispam on
@@ -82,58 +113,36 @@ module.exports.run = async function ({
     );
   }
 
-  // ON
-  if (sub === "on") {
+  // ── SAVE STATUS ───────────────────
+  const enabled =
+    sub === "on";
 
-    await setData(
-      `antispam/${threadID}`,
-      {
-        enabled: true
-      }
-    );
+  await setData(
+    `antispam/${threadID}`,
+    {
+      enabled
+    }
+  );
 
-    return api.sendMessage(
+  return api.sendMessage(
 
 `╭───────────────⭓
-│ ✅ ANTI SPAM ENABLED
+│ 🛡️ ANTISPAM
 ├───────────────⭔
-│ Users who send
-│ ${SPAM_LIMIT} messages within
-│ ${SPAM_TIME / 1000} seconds
-│ will be warned.
-│
-│ Next offense
-│ = auto kick.
+│ Status:
+│ ${
+  enabled
+    ? "✅ ENABLED"
+    : "❌ DISABLED"
+}
 ╰───────────────⭓`,
 
-      threadID,
-      messageID
-    );
-  }
-
-  // OFF
-  if (sub === "off") {
-
-    await setData(
-      `antispam/${threadID}`,
-      {
-        enabled: false
-      }
-    );
-
-    return api.sendMessage(
-
-`╭───────────────⭓
-│ 🛑 ANTI SPAM DISABLED
-╰───────────────⭓`,
-
-      threadID,
-      messageID
-    );
-  }
+    threadID,
+    messageID
+  );
 };
 
-// ── HANDLE EVENT ───────────────────────
+// ── HANDLE EVENT ────────────────────
 module.exports.handleEvent =
 async function ({
   api,
@@ -151,73 +160,76 @@ async function ({
     if (!body)
       return;
 
-    // get status
+    // ── CHECK STATUS ────────────────
     let data =
       await getData(
         `antispam/${threadID}`
       );
 
-    if (
-      !data ||
-      data.enabled !== true
-    ) return;
+    if (!data)
+      data = {
+        enabled: false
+      };
 
-    // ignore admins
-    const info =
-      await api.getThreadInfo(
-        threadID
-      );
-
-    const isAdmin =
-      info.adminIDs.some(
-        a => a.id == senderID
-      );
-
-    if (isAdmin)
+    if (!data.enabled)
       return;
 
-    // init thread
+    // ── INIT TRACKER ────────────────
     if (
       !spamTracker[threadID]
     ) {
 
-      spamTracker[threadID] = {};
+      spamTracker[
+        threadID
+      ] = {};
     }
 
-    // init user
     if (
-      !spamTracker[threadID][senderID]
+      !spamTracker[
+        threadID
+      ][senderID]
     ) {
 
-      spamTracker[threadID][senderID] = {
+      spamTracker[
+        threadID
+      ][senderID] = {
+
         count: 0,
-        firstTime: Date.now(),
-        warned: false
+
+        warned: false,
+
+        firstTime:
+          Date.now()
       };
     }
 
     const user =
-      spamTracker[threadID][senderID];
+      spamTracker[
+        threadID
+      ][senderID];
 
     const now =
       Date.now();
 
-    // reset after time
+    // ── RESET AFTER 10s ─────────────
     if (
-      now - user.firstTime >
-      SPAM_TIME
+      now -
+      user.firstTime >
+      10000
     ) {
 
       user.count = 0;
-      user.firstTime = now;
+
+      user.firstTime =
+        now;
     }
 
-    // add message count
+    // ── ADD COUNT ───────────────────
     user.count++;
 
-    // warning
+    // ── WARNING ─────────────────────
     if (
-      user.count >= SPAM_LIMIT &&
+      user.count >= 5 &&
       !user.warned
     ) {
 
@@ -225,7 +237,8 @@ async function ({
 
       user.count = 0;
 
-      user.firstTime = now;
+      user.firstTime =
+        now;
 
       return api.sendMessage(
 
@@ -235,10 +248,8 @@ async function ({
 │ User:
 │ ${senderID}
 │
-│ Stop sending
-│ messages too fast.
-│
-│ Next spam
+│ Stop spamming.
+│ Next offense
 │ = auto kick.
 ╰───────────────⭓`,
 
@@ -246,9 +257,9 @@ async function ({
       );
     }
 
-    // second offense
+    // ── AUTO KICK ───────────────────
     if (
-      user.count >= SPAM_LIMIT &&
+      user.count >= 5 &&
       user.warned
     ) {
 
@@ -259,18 +270,20 @@ async function ({
           threadID
         );
 
-        delete spamTracker
-          [threadID]
-          [senderID];
+        delete spamTracker[
+          threadID
+        ][senderID];
 
         return api.sendMessage(
 
 `╭───────────────⭓
 │ 🚨 USER KICKED
 ├───────────────⭔
+│ User:
 │ ${senderID}
-│ was removed
-│ for spamming.
+│
+│ Reason:
+│ Spam detected.
 ╰───────────────⭓`,
 
           threadID
