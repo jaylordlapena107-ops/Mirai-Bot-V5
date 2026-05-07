@@ -1,6 +1,6 @@
-const fs = global.nodemodule["fs-extra"];
-const axios = global.nodemodule["axios"];
-const request = global.nodemodule["request"];
+const fs = require("fs-extra");
+const axios = require("axios");
+const request = require("request");
 const moment = require("moment-timezone");
 
 module.exports.config = {
