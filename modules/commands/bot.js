@@ -1,5 +1,5 @@
 const axios = require("axios");
-const { getData, setData } = require("../../../database.js");
+const { getData, setData } = require("../../database.js");
 
 const bold = (text) => text;
 
@@ -22,7 +22,7 @@ const history = new Map();
 function makeHeader() {
   return (
     `╔════════════════════════════╗\n` +
-    `║ 🤖 ${bold(AI_NAME)} ${bold("v" + VERSION)} ║\n` +
+    `║ 🤖 ${AI_NAME} v${VERSION} ║\n` +
     `╚════════════════════════════╝\n`
   );
 }
@@ -30,13 +30,17 @@ function makeHeader() {
 function makeFooter() {
   return (
     `\n━━━━━━━━━━━━━━━━━━\n` +
-    `💬 ${bold("Reply")} para mag follow-up`
+    `💬 Reply para mag follow-up`
   );
 }
 
 // ── BOT STATUS ─────────────────────────────────────────
 async function getBotStatus(threadID) {
-  let data = (await getData(`botStatus/${threadID}`)) || {};
+  let data = await getData(`botStatus/${threadID}`);
+
+  if (!data) {
+    data = {};
+  }
 
   if (typeof data.enabled === "undefined") {
     return true;
@@ -46,7 +50,11 @@ async function getBotStatus(threadID) {
 }
 
 async function setBotStatus(threadID, status) {
-  let data = (await getData(`botStatus/${threadID}`)) || {};
+  let data = await getData(`botStatus/${threadID}`);
+
+  if (!data) {
+    data = {};
+  }
 
   data.enabled = status;
 
@@ -75,7 +83,9 @@ async function chat(message, uid, name, threadID) {
       }
     );
 
-    let reply = res.data?.reply || "Wala akong maisagot.";
+    let reply =
+      res.data?.reply ||
+      "Wala akong maisagot.";
 
     h.push({
       role: "assistant",
@@ -92,6 +102,7 @@ async function chat(message, uid, name, threadID) {
 
   } catch (e) {
     console.error("[AI ERROR]", e.message);
+
     return "Hindi ako makareply ngayon, try ulit mamaya.";
   }
 }
@@ -109,7 +120,10 @@ module.exports.config = {
 };
 
 // ── AUTO REPLY ─────────────────────────────────────────
-module.exports.handleEvent = async function ({ api, event }) {
+module.exports.handleEvent = async function ({
+  api,
+  event
+}) {
   try {
     const body = (event.body || "").trim();
 
@@ -138,8 +152,7 @@ module.exports.handleEvent = async function ({ api, event }) {
     if (
       event.type === "message_reply" &&
       event.messageReply &&
-      String(event.messageReply.senderID) === botID &&
-      event.messageReply.body?.includes("🤖")
+      String(event.messageReply.senderID) === botID
     ) {
       trigger = true;
     }
@@ -151,15 +164,23 @@ module.exports.handleEvent = async function ({ api, event }) {
       .replace(/\b(bot|jandel)\b/gi, "")
       .trim();
 
-    if (!cleaned) cleaned = "hello";
+    if (!cleaned) {
+      cleaned = "hello";
+    }
 
-    api.setMessageReaction("⏳", event.messageID, () => {}, true);
+    api.setMessageReaction(
+      "⏳",
+      event.messageID,
+      () => {},
+      true
+    );
 
     // get user info
     let userName = "Guest";
 
     try {
-      const userInfo = await api.getUserInfo(senderID);
+      const userInfo =
+        await api.getUserInfo(senderID);
 
       userName =
         userInfo[senderID]?.name ||
@@ -174,11 +195,16 @@ module.exports.handleEvent = async function ({ api, event }) {
       threadID
     );
 
-    api.setMessageReaction("✅", event.messageID, () => {}, true);
+    api.setMessageReaction(
+      "✅",
+      event.messageID,
+      () => {},
+      true
+    );
 
     const finalReply =
       makeHeader() +
-      `💬 ${bold("SAGOT")}\n` +
+      `💬 SAGOT\n` +
       `━━━━━━━━━━━━━━━━━━\n` +
       `${answer} 🤖` +
       makeFooter();
@@ -195,30 +221,35 @@ module.exports.handleEvent = async function ({ api, event }) {
 };
 
 // ── COMMANDS ───────────────────────────────────────────
-module.exports.run = async function ({ api, event, args }) {
+module.exports.run = async function ({
+  api,
+  event,
+  args
+}) {
   const threadID = event.threadID;
 
   if (!args[0]) {
     return api.sendMessage(
       `╔════════════════════╗\n` +
-      `║ 🤖 ${bold(AI_NAME)} ║\n` +
+      `║ 🤖 ${AI_NAME} ║\n` +
       `╚════════════════════╝\n\n` +
-      `📌 ${bold("/bot on")} — enable AI\n` +
-      `📌 ${bold("/bot off")} — disable AI\n` +
-      `📌 ${bold("/bot status")} — check status`,
+      `📌 /bot on — enable AI\n` +
+      `📌 /bot off — disable AI\n` +
+      `📌 /bot status — check status`,
       threadID,
       event.messageID
     );
   }
 
-  const choice = args[0].toLowerCase();
+  const choice =
+    args[0].toLowerCase();
 
   // ON
   if (choice === "on") {
     await setBotStatus(threadID, true);
 
     return api.sendMessage(
-      `✅ ${bold("Bot replies are now ON")}`,
+      `✅ Bot replies are now ON`,
       threadID,
       event.messageID
     );
@@ -229,7 +260,7 @@ module.exports.run = async function ({ api, event, args }) {
     await setBotStatus(threadID, false);
 
     return api.sendMessage(
-      `⛔ ${bold("Bot replies are now OFF")}`,
+      `⛔ Bot replies are now OFF`,
       threadID,
       event.messageID
     );
@@ -237,10 +268,11 @@ module.exports.run = async function ({ api, event, args }) {
 
   // STATUS
   if (choice === "status") {
-    const isOn = await getBotStatus(threadID);
+    const isOn =
+      await getBotStatus(threadID);
 
     return api.sendMessage(
-      `📊 ${bold("Bot Status")}\n\n` +
+      `📊 Bot Status\n\n` +
       `${isOn ? "✅ ON" : "⛔ OFF"}`,
       threadID,
       event.messageID
