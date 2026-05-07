@@ -1,12 +1,10 @@
 /**
- * joinNoti event — Welcome new members with image + voice
+ * joinNoti event — Welcome new members with text + voice
  * TEAM STARTCOPE BETA
  */
 
-const bold = require('../../utils/bold');
 const fs = require('fs-extra');
 const path = require('path');
-const axios = require('axios');
 
 const TEMP_DIR = path.join(
   process.cwd(),
@@ -18,9 +16,9 @@ fs.ensureDirSync(TEMP_DIR);
 module.exports.config = {
   name: 'joinNoti',
   eventType: ['log:subscribe'],
-  version: '5.0.0',
+  version: '6.0.0',
   credits: 'Mirai Team | TEAM STARTCOPE BETA',
-  description: 'Welcome new members with image + voice',
+  description: 'Welcome new members with text + voice',
 };
 
 // ── GENERATE VOICE ────────────────────────────────────
@@ -120,9 +118,9 @@ module.exports.run = async function ({
     );
 
     return api.sendMessage(
-      `👋 ${bold('Hello Everyone!')}\n\n` +
-      `🤖 I'm ${bold(global.config.BOTNAME || 'Mirai Bot')}!\n` +
-      `⌨️ Prefix: ${bold(global.config.PREFIX)}\n` +
+      `👋 Hello Everyone!\n\n` +
+      `🤖 I'm ${global.config.BOTNAME || 'Mirai Bot'}!\n` +
+      `⌨️ Prefix: ${global.config.PREFIX}\n` +
       `📖 Type ${global.config.PREFIX}help to see commands!`,
       threadID
     );
@@ -183,75 +181,38 @@ module.exports.run = async function ({
       }
     }
 
-    const firstUser =
-      event.logMessageData.addedParticipants[0];
+    // ── SEND WELCOME MESSAGE ──────────────────────────
+    api.sendMessage(
+      {
+        body:
+`👋 Welcome ${nameArray.join(', ')}!
 
-    // ── WELCOME IMAGE ─────────────────────────────────
-    try {
+🎉 Welcome to ${safeThreadName}
+🔢 You are member #${memLengths[0]}
 
-      const avatarUrl =
-        `https://graph.facebook.com/${firstUser.userFbId}/picture?width=512&height=512`;
+━━━━━━━━━━━━━━━
+🌿 BARKADA CRAFT SMP
+━━━━━━━━━━━━━━━
 
-      const welcomeAPI =
-        `https://urangkapolka.vercel.app/api/welcome` +
-        `?username=${encodeURIComponent(nameArray.join(', '))}` +
-        `&avatarUrl=${encodeURIComponent(avatarUrl)}` +
-        `&groupname=${encodeURIComponent(safeThreadName)}` +
-        `&bg=${encodeURIComponent('https://i.imgur.com/YzgoR04.png')}` +
-        `&memberCount=${encodeURIComponent(memLengths[0])}`;
+📡 SERVER IPs
 
-      const imgPath = path.join(
-        TEMP_DIR,
-        `welcome_${Date.now()}.png`
-      );
+🇵🇭 PH SERVER
+┃ JAVA IP: barkadacraftsmp.ph1-mczie.fun:4090
+┃ BEDROCK IP: barkadacraftsmp.ph1-mczie.fun
+┃ PORT: 4090
 
-      const response = await axios({
-        url: welcomeAPI,
-        method: 'GET',
-        responseType: 'stream'
-      });
+🇸🇬 SG SERVER
+┃ JAVA IP: barkadacraftsmp.sg1-mczie.fun:4090
+┃ BEDROCK IP: barkadacraftsmp.sg1-mczie.fun
+┃ PORT: 4090
 
-      const writer =
-        fs.createWriteStream(imgPath);
-
-      response.data.pipe(writer);
-
-      await new Promise((resolve, reject) => {
-
-        writer.on('finish', resolve);
-        writer.on('error', reject);
-      });
-
-      // SEND IMAGE
-      api.sendMessage(
-        {
-          body:
-            `👋 Welcome ${nameArray.join(', ')}!\n` +
-            `🎉 Welcome to ${safeThreadName}\n` +
-            `🔢 Member #${memLengths[0]}`,
-          attachment:
-            fs.createReadStream(imgPath),
-          mentions
-        },
-        threadID,
-        () => {
-
-          setTimeout(() => {
-
-            fs.remove(imgPath)
-              .catch(() => {});
-
-          }, 120000);
-        }
-      );
-
-    } catch (err) {
-
-      console.log(
-        '[JoinNoti] Welcome image failed:',
-        err.message
-      );
-    }
+━━━━━━━━━━━━━━━
+🎮 Join to BarkadaCraft SMP now!
+`,
+        mentions
+      },
+      threadID
+    );
 
     // ── VOICE WELCOME ─────────────────────────────────
     const firstNames = nameArray.map(name =>
