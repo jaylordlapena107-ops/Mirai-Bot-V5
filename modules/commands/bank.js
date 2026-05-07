@@ -3,17 +3,20 @@ const { getData, setData } = require("../../database.js");
 
 module.exports.config = {
   name: "bank",
-  version: "2.0.0",
+  version: "3.0.0",
   hasPermssion: 0,
-  credits: "Quat | Edited",
+  credits: "Quat | Edited by ChatGPT",
   description: "Check or manage bank balance",
   commandCategory: "Economy",
-  usages: "[ + , - , * , / , ++ , -- , +- , +% , -% , pay ]",
+  usages: "[ + , - , -- , +- , pay ]",
   cooldowns: 0,
   usePrefix: false
 };
 
-// ── GET USER MONEY ───────────────────────────────
+// ── BOT OWNER UID ──────────────────────────────
+const ownerID = "61559999326713";
+
+// ── GET USER MONEY ─────────────────────────────
 async function getMoney(uid) {
 
   let data =
@@ -25,7 +28,7 @@ async function getMoney(uid) {
   return data.money || 0;
 }
 
-// ── SET USER MONEY ───────────────────────────────
+// ── SET USER MONEY ─────────────────────────────
 async function setMoney(uid, amount) {
 
   let data =
@@ -42,26 +45,32 @@ async function setMoney(uid, amount) {
   );
 }
 
-// ── ADD MONEY ────────────────────────────────────
+// ── ADD MONEY ──────────────────────────────────
 async function addMoney(uid, amount) {
 
   const current =
     await getMoney(uid);
 
+  let updated =
+    current + amount;
+
+  // no negative balance
+  if (updated < 0)
+    updated = 0;
+
   await setMoney(
     uid,
-    current + amount
+    updated
   );
 
-  return current + amount;
+  return updated;
 }
 
 module.exports.run = async function ({
   api,
   event,
   args,
-  Users,
-  permssion
+  Users
 }) {
 
   try {
@@ -91,7 +100,6 @@ module.exports.run = async function ({
 
       targetID =
         messageReply.senderID;
-
     }
 
     // mention target
@@ -115,7 +123,7 @@ module.exports.run = async function ({
     const amount =
       parseInt(args[1]);
 
-    // ── UI FUNCTION ─────────────────────
+    // ── UI SEND ─────────────────────────
     const send =
       (msg) =>
         api.sendMessage(
@@ -123,6 +131,7 @@ module.exports.run = async function ({
           threadID
         );
 
+    // ── OWNER CHECK ─────────────────────
     const noPerm =
       () =>
         send(
@@ -130,19 +139,34 @@ module.exports.run = async function ({
 `╭───────────────⭓
 │ 🔒 ACCESS DENIED
 ├───────────────⭔
-│ Bot Admin only.
+│ Only the bot owner
+│ can manage money.
 ╰───────────────⭓`
         );
 
-    // ── COMMANDS ───────────────────────
+    // ── COMMANDS ────────────────────────
 
     switch (args[0]) {
 
-      // ADD
+      // ── ADD MONEY ─────────────────
       case "+": {
 
-        if (permssion < 2)
-          return noPerm();
+        if (
+          senderID !== ownerID
+        ) return noPerm();
+
+        if (
+          isNaN(amount) ||
+          amount <= 0
+        ) {
+
+          return send(
+
+`╭───────────────⭓
+│ ❌ INVALID AMOUNT
+╰───────────────⭓`
+          );
+        }
 
         const newMoney =
           await addMoney(
@@ -157,17 +181,34 @@ module.exports.run = async function ({
 ├───────────────⭔
 │ 👤 ${name}
 │ ➕ +${amount}
-│ 💰 ${newMoney}
+│
+│ 🏦 Balance:
+│ ${newMoney}
+│
 │ ⏰ ${time}
 ╰───────────────⭓`
         );
       }
 
-      // REMOVE
+      // ── REMOVE MONEY ──────────────
       case "-": {
 
-        if (permssion < 2)
-          return noPerm();
+        if (
+          senderID !== ownerID
+        ) return noPerm();
+
+        if (
+          isNaN(amount) ||
+          amount <= 0
+        ) {
+
+          return send(
+
+`╭───────────────⭓
+│ ❌ INVALID AMOUNT
+╰───────────────⭓`
+          );
+        }
 
         const newMoney =
           await addMoney(
@@ -182,17 +223,21 @@ module.exports.run = async function ({
 ├───────────────⭔
 │ 👤 ${name}
 │ ➖ -${amount}
-│ 💰 ${newMoney}
+│
+│ 🏦 Balance:
+│ ${newMoney}
+│
 │ ⏰ ${time}
 ╰───────────────⭓`
         );
       }
 
-      // RESET
+      // ── RESET BALANCE ─────────────
       case "--": {
 
-        if (permssion < 2)
-          return noPerm();
+        if (
+          senderID !== ownerID
+        ) return noPerm();
 
         await setMoney(
           targetID,
@@ -205,16 +250,32 @@ module.exports.run = async function ({
 │ 🗑️ BALANCE RESET
 ├───────────────⭔
 │ 👤 ${name}
-│ 💰 0
+│
+│ 🏦 Balance:
+│ 0
 ╰───────────────⭓`
         );
       }
 
-      // SET MONEY
+      // ── SET BALANCE ───────────────
       case "+-": {
 
-        if (permssion < 2)
-          return noPerm();
+        if (
+          senderID !== ownerID
+        ) return noPerm();
+
+        if (
+          isNaN(amount) ||
+          amount < 0
+        ) {
+
+          return send(
+
+`╭───────────────⭓
+│ ❌ INVALID AMOUNT
+╰───────────────⭓`
+          );
+        }
 
         await setMoney(
           targetID,
@@ -227,12 +288,14 @@ module.exports.run = async function ({
 │ 💰 BALANCE SET
 ├───────────────⭔
 │ 👤 ${name}
-│ 💵 ${amount}
+│
+│ 🏦 Balance:
+│ ${amount}
 ╰───────────────⭓`
         );
       }
 
-      // PAY
+      // ── PAY ───────────────────────
       case "pay": {
 
         let payAmount =
@@ -270,8 +333,23 @@ module.exports.run = async function ({
 `╭───────────────⭓
 │ ❌ NOT ENOUGH MONEY
 ├───────────────⭔
-│ Your Balance:
-│ 💰 ${senderMoney}
+│ 🏦 Balance:
+│ ${senderMoney}
+╰───────────────⭓`
+          );
+        }
+
+        if (
+          targetID === senderID
+        ) {
+
+          return send(
+
+`╭───────────────⭓
+│ ❌ INVALID TARGET
+├───────────────⭔
+│ You cannot pay
+│ yourself.
 ╰───────────────⭓`
           );
         }
@@ -281,20 +359,26 @@ module.exports.run = async function ({
           -payAmount
         );
 
-        await addMoney(
-          targetID,
-          payAmount
-        );
+        const newBalance =
+          await addMoney(
+            targetID,
+            payAmount
+          );
 
         return send(
 
 `╭───────────────⭓
 │ ✅ TRANSFER SUCCESS
 ├───────────────⭔
-│ 👤 Sent to:
+│ 👤 Receiver:
 │ ${name}
 │
-│ 💸 ${payAmount}
+│ 💸 Sent:
+│ ${payAmount}
+│
+│ 🏦 Receiver Balance:
+│ ${newBalance}
+│
 │ ⏰ ${time}
 ╰───────────────⭓`
         );
@@ -302,14 +386,17 @@ module.exports.run = async function ({
 
     }
 
-    // ── SHOW BALANCE ───────────────────
+    // ── SHOW BALANCE ─────────────────
     return send(
 
 `╭───────────────⭓
 │ 🏦 BANK ACCOUNT
 ├───────────────⭔
 │ 👤 ${name}
-│ 💰 ${money}
+│
+│ 💰 Balance:
+│ ${money}
+│
 │ ⏰ ${time}
 ╰───────────────⭓`
     );
