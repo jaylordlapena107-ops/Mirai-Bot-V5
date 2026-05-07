@@ -5,7 +5,7 @@ const {
 
 module.exports.config = {
   name: "antispam",
-  version: "2.0.0",
+  version: "3.0.0",
   credits: "ChatGPT",
   description:
     "Anti spam system with warning + auto kick",
@@ -18,6 +18,10 @@ module.exports.config = {
 
 // ── SPAM TRACKER ─────────────────────
 const spamTracker = {};
+
+// ── OWNER ID ─────────────────────────
+const ownerID =
+  "61559999326713";
 
 // ── COMMAND ──────────────────────────
 module.exports.run =
@@ -37,29 +41,36 @@ async function ({
     (args[0] || "")
     .toLowerCase();
 
-  // ── GET ADMIN INFO ────────────────
-  let isAdmin = false;
+  // ── OWNER BYPASS ──────────────────
+  if (senderID == ownerID) {
 
-  try {
+    // owner can use directly
 
-    const info =
-      await api.getThreadInfo(
-        threadID
+  } else {
+
+    // ── GET ADMIN INFO ──────────────
+    let isAdmin = false;
+
+    try {
+
+      const info =
+        await api.getThreadInfo(
+          threadID
+        );
+
+      isAdmin =
+        info.adminIDs.some(
+          a => a.id == senderID
+        );
+
+    } catch (e) {
+
+      console.log(
+        "THREAD INFO ERROR:",
+        e
       );
 
-    isAdmin =
-      info.adminIDs.some(
-        a => a.id == senderID
-      );
-
-  } catch (e) {
-
-    console.log(
-      "THREAD INFO ERROR:",
-      e
-    );
-
-    return api.sendMessage(
+      return api.sendMessage(
 
 `╭───────────────⭓
 │ ❌ FAILED
@@ -70,15 +81,15 @@ async function ({
 │ Try again later.
 ╰───────────────⭓`,
 
-      threadID,
-      messageID
-    );
-  }
+        threadID,
+        messageID
+      );
+    }
 
-  // ── ADMIN CHECK ───────────────────
-  if (!isAdmin) {
+    // ── ADMIN CHECK ─────────────────
+    if (!isAdmin) {
 
-    return api.sendMessage(
+      return api.sendMessage(
 
 `╭───────────────⭓
 │ ❌ ACCESS DENIED
@@ -87,9 +98,10 @@ async function ({
 │ can use this.
 ╰───────────────⭓`,
 
-      threadID,
-      messageID
-    );
+        threadID,
+        messageID
+      );
+    }
   }
 
   // ── INVALID ───────────────────────
@@ -160,6 +172,17 @@ async function ({
     if (!body)
       return;
 
+    // ── OWNER + BOT BYPASS ─────────
+    const botID =
+      String(
+        api.getCurrentUserID()
+      );
+
+    if (
+      senderID == ownerID ||
+      senderID == botID
+    ) return;
+
     // ── CHECK STATUS ────────────────
     let data =
       await getData(
@@ -220,11 +243,13 @@ async function ({
 
       user.count = 0;
 
+      user.warned = false;
+
       user.firstTime =
         now;
     }
 
-    // ── ADD COUNT ───────────────────
+    // ── COUNT EVERY MESSAGE ─────────
     user.count++;
 
     // ── WARNING ─────────────────────
