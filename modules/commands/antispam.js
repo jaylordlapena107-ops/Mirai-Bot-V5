@@ -1,32 +1,44 @@
 const {
-  getData,
-  setData
+  setData,
+  getData
 } = require("../../database.js");
 
 module.exports.config = {
-  name: "antispam",
-  version: "4.0.0",
-  credits: "ChatGPT",
+  name: "spamkick",
+  version: "2.0.0",
+  hasPermssion: 1,
+  credits: "Jaylord La Peña + ChatGPT",
   description:
-    "Anti spam system with warning + auto kick",
-  usages:
-    "/antispam on | off",
+    "Auto kick users who spam messages",
   commandCategory:
     "moderation",
-  cooldowns: 3,
+
+  usages: `
+📌 /spamkick on <limit>
+📌 /spamkick off
+📌 /spamkick status
+`,
+
+  cooldowns: 5,
 
   // IMPORTANT
   handleEvent: true
 };
 
-// ── SPAM TRACKER ─────────────────────
-const spamTracker = {};
+// ── MEMORY CACHE ────────────────────
+let spamCache = {};
 
-// ── OWNER ID ─────────────────────────
-const ownerID =
+// ── PROTECTED USERS ─────────────────
+const PROTECTED_UIDS = [
+  "61559999326713",
+  "61554885397487"
+];
+
+// ── OWNER ───────────────────────────
+const OWNER_UID =
   "61559999326713";
 
-// ── COMMAND ──────────────────────────
+// ── COMMAND ─────────────────────────
 module.exports.run =
 async function ({
   api,
@@ -36,81 +48,60 @@ async function ({
 
   const {
     threadID,
-    messageID,
-    senderID
+    senderID,
+    messageID
   } = event;
 
-  const sub =
-    (args[0] || "")
-    .toLowerCase();
-
-  // ── OWNER BYPASS ──────────────────
-  if (senderID != ownerID) {
-
-    let isAdmin = false;
-
-    try {
-
-      const info =
-        await api.getThreadInfo(
-          threadID
-        );
-
-      isAdmin =
-        info.adminIDs.some(
-          a => a.id == senderID
-        );
-
-    } catch (e) {
-
-      console.log(e);
-
-      return api.sendMessage(
-
-`╭───────────────⭓
-│ ❌ FAILED
-├───────────────⭔
-│ Cannot get
-│ group info.
-╰───────────────⭓`,
-
-        threadID,
-        messageID
-      );
-    }
-
-    // ── ADMIN CHECK ─────────────────
-    if (!isAdmin) {
-
-      return api.sendMessage(
-
-`╭───────────────⭓
-│ ❌ ACCESS DENIED
-├───────────────⭔
-│ Only GC admins
-│ can use this.
-╰───────────────⭓`,
-
-        threadID,
-        messageID
-      );
-    }
-  }
-
-  // ── INVALID USAGE ─────────────────
+  // ── OWNER ONLY ───────────────────
   if (
-    sub !== "on" &&
-    sub !== "off"
+    senderID !== OWNER_UID
   ) {
 
     return api.sendMessage(
 
+      "❌ Only owner can use this command.",
+
+      threadID,
+      messageID
+    );
+  }
+
+  // ── NO ARGS ──────────────────────
+  if (!args.length) {
+
+    return api.sendMessage(
+
+      module.exports.config.usages,
+
+      threadID,
+      messageID
+    );
+  }
+
+  const sub =
+    args[0].toLowerCase();
+
+  // ── ENABLE ───────────────────────
+  if (sub === "on") {
+
+    const limit =
+      parseInt(args[1]) || 10;
+
+    await setData(
+      `spamkick/${threadID}`,
+      {
+        enabled: true,
+        limit
+      }
+    );
+
+    return api.sendMessage(
+
 `╭───────────────⭓
-│ 🛡️ ANTISPAM
+│ ✅ SPAMKICK ENABLED
 ├───────────────⭔
-│ Usage:
-│ /antispam on
-│ /antispam off
+│ Limit:
+│ ${limit} messages
 ╰───────────────⭓`,
 
       threadID,
@@ -118,36 +109,70 @@ async function ({
     );
   }
 
-  // ── SAVE STATUS ───────────────────
-  const enabled =
-    sub === "on";
+  // ── DISABLE ──────────────────────
+  if (sub === "off") {
 
-  await setData(
-    `antispam/${threadID}`,
-    {
-      enabled
-    }
-  );
+    await setData(
+      `spamkick/${threadID}`,
+      {
+        enabled: false
+      }
+    );
 
-  return api.sendMessage(
+    return api.sendMessage(
 
 `╭───────────────⭓
-│ 🛡️ ANTISPAM
-├───────────────⭔
-│ Status:
-│ ${
-  enabled
-    ? "✅ ENABLED"
-    : "❌ DISABLED"
-}
+│ ❌ SPAMKICK DISABLED
 ╰───────────────⭓`,
+
+      threadID,
+      messageID
+    );
+  }
+
+  // ── STATUS ───────────────────────
+  if (sub === "status") {
+
+    const data =
+      await getData(
+        `spamkick/${threadID}`
+      ) || {
+        enabled: false,
+        limit: 10
+      };
+
+    return api.sendMessage(
+
+`╭───────────────⭓
+│ 📊 SPAMKICK STATUS
+├───────────────⭔
+│ Enabled:
+│ ${
+  data.enabled
+    ? "✅ YES"
+    : "❌ NO"
+}
+│
+│ Limit:
+│ ${data.limit || 10}
+╰───────────────⭓`,
+
+      threadID,
+      messageID
+    );
+  }
+
+  // ── INVALID ──────────────────────
+  return api.sendMessage(
+
+    module.exports.config.usages,
 
     threadID,
     messageID
   );
 };
 
-// ── HANDLE EVENT ────────────────────
+// ── EVENT LISTENER ─────────────────
 module.exports.handleEvent =
 async function ({
   api,
@@ -162,137 +187,115 @@ async function ({
       body
     } = event;
 
-    // ── DEBUG ───────────────────────
+    // ── DEBUG ──────────────────────
     console.log(
-      "MESSAGE:",
+      "[SPAM EVENT]",
       senderID,
       body
     );
 
-    if (!body)
-      return;
-
-    // ── BOT ID ──────────────────────
-    const botID =
-      String(
-        api.getCurrentUserID()
-      );
-
-    // ── BYPASS ──────────────────────
     if (
-      senderID == ownerID ||
-      senderID == botID
+      !threadID ||
+      !senderID ||
+      !body
     ) return;
 
-    // ── CHECK STATUS ────────────────
-    let data =
+    // ── SKIP PROTECTED ─────────────
+    if (
+      PROTECTED_UIDS.includes(
+        senderID
+      )
+    ) return;
+
+    // ── GET CONFIG ─────────────────
+    const config =
       await getData(
-        `antispam/${threadID}`
+        `spamkick/${threadID}`
       );
 
-    if (!data)
-      data = {
-        enabled: false
-      };
-
-    if (!data.enabled)
-      return;
-
-    // ── INIT THREAD ─────────────────
     if (
-      !spamTracker[threadID]
+      !config ||
+      !config.enabled
+    ) return;
+
+    // ── INIT THREAD ────────────────
+    if (
+      !spamCache[threadID]
     ) {
 
-      spamTracker[
+      spamCache[
         threadID
       ] = {};
     }
 
-    // ── INIT USER ───────────────────
+    // ── INIT USER ──────────────────
     if (
-      !spamTracker[
+      !spamCache[
         threadID
       ][senderID]
     ) {
 
-      spamTracker[
+      spamCache[
         threadID
       ][senderID] = {
 
         count: 0,
 
-        warned: false,
-
-        firstTime:
+        lastMsg:
           Date.now()
       };
     }
 
-    const user =
-      spamTracker[
+    const userData =
+      spamCache[
         threadID
       ][senderID];
 
     const now =
       Date.now();
 
-    // ── RESET AFTER 10s ─────────────
+    // ── RESET AFTER 5s ─────────────
     if (
       now -
-      user.firstTime >
-      10000
+      userData.lastMsg >
+      5000
     ) {
 
-      user.count = 0;
-
-      user.warned = false;
-
-      user.firstTime =
-        now;
+      userData.count = 0;
     }
 
-    // ── ADD COUNT ───────────────────
-    user.count++;
+    // ── ADD COUNT ──────────────────
+    userData.count++;
+
+    userData.lastMsg =
+      now;
 
     console.log(
-      `SPAM COUNT ${senderID}:`,
-      user.count
+      `[SPAM COUNT] ${senderID}:`,
+      userData.count
     );
 
-    // ── WARNING ─────────────────────
+    // ── WARNING ────────────────────
     if (
-      user.count >= 5 &&
-      !user.warned
+      userData.count ===
+      config.limit - 2
     ) {
 
-      user.warned = true;
+      api.sendMessage(
 
-      user.count = 0;
+`⚠️ Warning!
 
-      user.firstTime =
-        now;
-
-      return api.sendMessage(
-
-`╭───────────────⭓
-│ ⚠️ SPAM WARNING
-├───────────────⭔
-│ User:
-│ ${senderID}
-│
-│ Stop spamming.
-│ Next spam
-│ = auto kick.
-╰───────────────⭓`,
+Stop spamming or
+you will be kicked.`,
 
         threadID
       );
     }
 
-    // ── AUTO KICK ───────────────────
+    // ── AUTO KICK ──────────────────
     if (
-      user.count >= 5 &&
-      user.warned
+      userData.count >=
+      config.limit
     ) {
 
       try {
@@ -302,21 +305,9 @@ async function ({
           threadID
         );
 
-        delete spamTracker[
-          threadID
-        ][senderID];
+        api.sendMessage(
 
-        return api.sendMessage(
-
-`╭───────────────⭓
-│ 🚨 USER KICKED
-├───────────────⭔
-│ User:
-│ ${senderID}
-│
-│ Reason:
-│ Spam detected.
-╰───────────────⭓`,
+`🚨 User kicked for spamming.`,
 
           threadID
         );
@@ -328,24 +319,23 @@ async function ({
           e
         );
 
-        return api.sendMessage(
+        api.sendMessage(
 
-`╭───────────────⭓
-│ ❌ FAILED TO KICK
-├───────────────⭔
-│ Make sure the
-│ bot is admin.
-╰───────────────⭓`,
+`❌ Failed to kick user.
+Make sure bot is admin.`,
 
           threadID
         );
       }
+
+      // RESET
+      userData.count = 0;
     }
 
   } catch (e) {
 
     console.log(
-      "ANTISPAM ERROR:",
+      "SPAMKICK ERROR:",
       e
     );
   }
