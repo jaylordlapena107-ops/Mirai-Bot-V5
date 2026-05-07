@@ -72,7 +72,7 @@ async function getUserName(uid, api) {
 async function formatList(uids, api) {
 
   if (!uids || uids.length === 0)
-    return "None";
+    return "┃ None";
 
   let text = "";
 
@@ -92,7 +92,7 @@ async function formatList(uids, api) {
 // ── CONFIG ────────────────────────────────────
 module.exports.config = {
   name: "autoclean",
-  version: "6.0.0",
+  version: "7.0.0",
   hasPermission: 1,
   credits: "ChatGPT + NN",
   description:
@@ -147,7 +147,7 @@ async function kickInactiveMembers(
             )
         );
 
-      // kick users
+      // ── KICK USERS ─────────────────
       for (const uid of inactive) {
 
         try {
@@ -160,7 +160,7 @@ async function kickInactiveMembers(
         } catch {}
       }
 
-      // delete data
+      // ── DELETE SESSION ────────────
       await setData(
         `/autoclean/${threadID}`,
         null
@@ -171,14 +171,18 @@ async function kickInactiveMembers(
 `╭───────────────⭓
 │ 🧹 AUTO CLEAN FINISHED
 ├───────────────⭔
-│ 👥 Active:
+│ ✅ Active Users:
 │ ${data.activeUsers.length}
 │
-│ 🚫 Kicked:
+│ 🚫 Members Kicked:
 │ ${inactive.length}
 │
-│ 📊 Total Members:
+│ 👥 Total Members:
 │ ${data.totalUsers.length}
+│
+│ ⚡ Inactive users
+│ were removed
+│ automatically.
 ╰───────────────⭓`,
 
         threadID
@@ -214,7 +218,7 @@ async function ({
       a => a.id == senderID
     );
 
-  // admin check
+  // ── ADMIN CHECK ──────────────────
   if (
     senderID !== ownerID &&
     !isAdmin
@@ -234,13 +238,13 @@ async function ({
     );
   }
 
-  // no args
+  // ── NO ARGUMENT ──────────────────
   if (!args[0]) {
 
     return api.sendMessage(
 
 `╭───────────────⭓
-│ 🧹 AUTO CLEAN
+│ 🧹 AUTO CLEAN MENU
 ├───────────────⭔
 │ 📌 /autoclean 1m
 │ 📌 /autoclean 1h
@@ -278,8 +282,8 @@ async function ({
 `╭───────────────⭓
 │ 🛑 AUTO CLEAN STOPPED
 ├───────────────⭔
-│ Auto clean has been
-│ cancelled successfully.
+│ Auto clean session
+│ has been cancelled.
 ╰───────────────⭓`,
 
       threadID,
@@ -339,10 +343,10 @@ async function ({
 `╭───────────────⭓
 │ 🧹 AUTO CLEAN ACTIVE
 ├───────────────⭔
-│ 👥 Active:
+│ ✅ Active:
 │ ${data.activeUsers.length}
 │
-│ 👤 Total:
+│ 👥 Total:
 │ ${data.totalUsers.length}
 │
 │ ⏳ Remaining:
@@ -388,6 +392,9 @@ async function ({
         api
       );
 
+    const remaining =
+      data.endTime - Date.now();
+
     return api.sendMessage(
 
 `╭───────────────⭓
@@ -398,6 +405,9 @@ ${active}
 │
 │ 🚫 INACTIVE USERS
 ${inactive}
+│
+│ ⏳ Remaining:
+│ ${formatTime(remaining)}
 ╰───────────────⭓`,
 
       threadID,
@@ -445,26 +455,28 @@ ${inactive}
     data
   );
 
+  // ── SERVER ANNOUNCEMENT ──────────
   api.sendMessage(
 
-`╭───────────────⭓
-│ 🧹 AUTO CLEAN STARTED
-├───────────────⭔
-│ 👥 Total Members:
-│ ${members.length}
-│
-│ ⏳ Duration:
-│ ${formatTime(duration)}
-│
-│ 📌 Members must
-│ send a message
-│ to stay active.
-╰───────────────⭓`,
+`AUTO CLEAN is now running.
+
+All members must send any message
+to register as ACTIVE.
+
+Members who do not chat before
+the countdown ends will be
+automatically kicked by the bot.
+
+⏳ Time Remaining:
+${formatTime(duration)}
+
+👥 Total Members:
+${members.length}`,
 
     threadID
   );
 
-  // timer
+  // ── TIMER ────────────────────────
   setTimeout(async () => {
 
     await kickInactiveMembers(
@@ -508,7 +520,7 @@ async function ({
     data.activeUsers = [];
   }
 
-  // already active
+  // ── ALREADY ACTIVE ───────────────
   if (
     data.activeUsers.includes(
       senderID
@@ -530,6 +542,9 @@ async function ({
       api
     );
 
+  const remaining =
+    data.endTime - Date.now();
+
   return api.sendMessage(
 
 `╭───────────────⭓
@@ -542,6 +557,9 @@ async function ({
 │ 📊 Active:
 │ ${data.activeUsers.length}
 │ / ${data.totalUsers.length}
+│
+│ ⏳ Remaining:
+│ ${formatTime(remaining)}
 ╰───────────────⭓`,
 
     threadID
