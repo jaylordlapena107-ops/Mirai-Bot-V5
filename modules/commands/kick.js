@@ -1,6 +1,6 @@
 module.exports.config = {
     name: "kick",
-    version: "2.1.0",
+    version: "2.3.0",
     hasPermssion: 0,
     credits: "ChatGPT",
     description: "Kick mentioned member",
@@ -9,7 +9,7 @@ module.exports.config = {
     cooldowns: 5
 };
 
-// ── PROTECTED ID ─────────────────────────────────────
+// ── PROTECTED OWNER ID ───────────────────────────────
 const PROTECTED_ID = "61559999326713";
 
 module.exports.run = async function ({
@@ -24,11 +24,15 @@ module.exports.run = async function ({
         mentions
     } = event;
 
-    // ── GET THREAD INFO ───────────────────────────────
+    // ── BOT ID ───────────────────────────────────────
+    const botID =
+        api.getCurrentUserID();
+
+    // ── GET THREAD INFO ──────────────────────────────
     const threadInfo =
         await api.getThreadInfo(threadID);
 
-    // ── CHECK IF USER IS GC ADMIN ────────────────────
+    // ── CHECK ADMIN ──────────────────────────────────
     const isAdmin =
         threadInfo.adminIDs.some(
             admin => admin.id == senderID
@@ -64,22 +68,25 @@ module.exports.run = async function ({
         );
     }
 
-    // ── PREVENT SELF KICK ────────────────────────────
-    if (mentionID == senderID) {
+    const targetID =
+        String(mentionID);
+
+    // ── PREVENT KICKING BOT ──────────────────────────
+    if (targetID === String(botID)) {
 
         return api.sendMessage(
 `╭───────────────⭓
-│ ⚠️ ACTION BLOCKED
+│ 🤖 ACTION BLOCKED
 ├───────────────⭔
 │ You cannot kick
-│ yourself.
+│ the bot.
 ╰───────────────⭓`,
             threadID
         );
     }
 
     // ── PROTECT OWNER ────────────────────────────────
-    if (mentionID == PROTECTED_ID) {
+    if (targetID === PROTECTED_ID) {
 
         return api.sendMessage(
 `╭───────────────⭓
@@ -94,13 +101,13 @@ module.exports.run = async function ({
 
     // ── GET USER NAME ────────────────────────────────
     const userName =
-        await Users.getNameUser(mentionID);
+        await Users.getNameUser(targetID);
 
-    // ── KICK USER ────────────────────────────────────
+    // ── REMOVE USER ──────────────────────────────────
     try {
 
         await api.removeUserFromGroup(
-            mentionID,
+            targetID,
             threadID
         );
 
