@@ -1,22 +1,24 @@
 const fs = require("fs-extra");
 const axios = require("axios");
+const request = require("request");
 const moment = require("moment-timezone");
 
 module.exports.config = {
   name: "resend",
-  version: "6.0.0",
+  version: "4.0.0",
   hasPermssion: 1,
   credits: "Thọ & Mod By DuyVuong + ChatGPT",
-  description: "Resend unsent messages with attachments",
+  description: "Resend unsent messages with attachment",
   usePrefix: true,
   commandCategory: "utility",
   usages: "resend",
   cooldowns: 0,
   dependencies: {
+    request: "",
     "fs-extra": "",
     axios: "",
     "moment-timezone": ""
-  },
+  }
 };
 
 module.exports.handleEvent = async function ({
@@ -29,7 +31,9 @@ module.exports.handleEvent = async function ({
     messageID,
     senderID,
     threadID,
-    body
+    body,
+    attachments,
+    type
   } = event;
 
   if (!global.logMessage)
@@ -49,7 +53,7 @@ module.exports.handleEvent = async function ({
   if (threadData.resend === false)
     return;
 
-  // get sender name
+  // get name
   let senderName =
     global.data.userName.get(senderID);
 
@@ -60,7 +64,7 @@ module.exports.handleEvent = async function ({
 
     senderName =
       Object.values(userInfo)[0]?.name ||
-      "Unknown User";
+      "Friend";
 
     global.data.userName.set(
       senderID,
@@ -68,19 +72,19 @@ module.exports.handleEvent = async function ({
     );
   }
 
-  // SAVE NORMAL MESSAGE
-  if (event.type !== "message_unsend") {
+  // save normal messages
+  if (type !== "message_unsend") {
 
     global.logMessage.set(messageID, {
 
-      senderID,
+      msgBody: body || "No text",
+
+      attachment:
+        attachments || [],
+
       senderName,
 
-      body:
-        body || "No text",
-
-      attachments:
-        event.attachments || [],
+      senderID,
 
       timeSent:
         moment()
@@ -91,11 +95,11 @@ module.exports.handleEvent = async function ({
     return;
   }
 
-  // UNSEND DETECTED
-  const msgData =
+  // detect unsend
+  const getMsg =
     global.logMessage.get(messageID);
 
-  if (!msgData)
+  if (!getMsg)
     return;
 
   const unsentTime =
@@ -103,101 +107,142 @@ module.exports.handleEvent = async function ({
       .tz("Asia/Manila")
       .format("hh:mm A | MMM DD YYYY");
 
-  let attachments = [];
+  // no attachment
+  if (
+    !getMsg.attachment ||
+    getMsg.attachment.length === 0
+  ) {
 
-  // DOWNLOAD ATTACHMENTS
-  for (let i = 0; i < msgData.attachments.length; i++) {
-
-    try {
-
-      const file =
-        msgData.attachments[i];
-
-      let ext = "dat";
-
-      if (file.type === "photo")
-        ext = "jpg";
-
-      else if (file.type === "video")
-        ext = "mp4";
-
-      else if (file.type === "audio")
-        ext = "mp3";
-
-      else if (file.type === "animated_image")
-        ext = "gif";
-
-      else if (file.type === "file")
-        ext = "bin";
-
-      const filePath =
-        __dirname +
-        `/cache/resend_${Date.now()}_${i}.${ext}`;
-
-      // STREAM DOWNLOAD
-      const response = await axios({
-        url: file.url,
-        method: "GET",
-        responseType: "stream"
-      });
-
-      await new Promise((resolve, reject) => {
-
-        const writer =
-          fs.createWriteStream(filePath);
-
-        response.data.pipe(writer);
-
-        writer.on("finish", resolve);
-
-        writer.on("error", reject);
-      });
-
-      attachments.push(
-        fs.createReadStream(filePath)
-      );
-
-    } catch (e) {
-
-      console.log(
-        "[RESEND ERROR]",
-        e.message
-      );
-    }
-  }
-
-  // SEND MESSAGE
-  return api.sendMessage({
-
-    attachment:
-      attachments.length > 0
-        ? attachments
-        : undefined,
-
-    body:
+    return api.sendMessage({
+      body:
 `🚨 MESSAGE UNSENT
 
-👤 Name: ${msgData.senderName}
+👤 Name: ${getMsg.senderName}
 
 💬 Message:
-${msgData.body}
-
-📎 Attachments:
-${msgData.attachments.length}
+${getMsg.msgBody}
 
 ⏰ Sent:
-${msgData.timeSent}
+${getMsg.timeSent}
 
 🗑️ Unsent:
 ${unsentTime}`,
 
+      mentions: [{
+        tag: getMsg.senderName,
+        id: getMsg.senderID,
+        fromIndex: 0
+      }]
+    },
+    threadID,
+    null,
+    messageID);
+  }
+
+  // with attachment
+  let msg = {
+
+    body:
+`🚨 MESSAGE UNSENT
+
+👤 Name: ${getMsg.senderName}
+
+💬 Message:
+${getMsg.msgBody}
+
+📎 Attachments:
+${getMsg.attachment.length}
+
+⏰ Sent:
+${getMsg.timeSent}
+
+🗑️ Unsent:
+${unsentTime}`,
+
+    attachment: [],
+
     mentions: [{
-      tag: msgData.senderName,
-      id: msgData.senderID,
+      tag: getMsg.senderName,
+      id: getMsg.senderID,
       fromIndex: 0
     }]
+  };
 
-  }, threadID);
+  let filePaths = [];
+  let num = 0;
+
+  for (const i of getMsg.attachment) {
+
+    try {
+
+      num++;
+
+      const getURL =
+        await request.get(i.url);
+
+      const pathname =
+        getURL.uri.pathname;
+
+      let ext = "jpg";
+
+      if (i.type === "photo")
+        ext = "jpg";
+
+      else if (i.type === "video")
+        ext = "mp4";
+
+      else if (i.type === "audio")
+        ext = "mp3";
+
+      else if (i.type === "animated_image")
+        ext = "gif";
+
+      else if (pathname.includes("."))
+        ext = pathname.substring(
+          pathname.lastIndexOf(".") + 1
+        );
+
+      const pathFile =
+        __dirname +
+        `/cache/${Date.now()}_${num}.${ext}`;
+
+      const data =
+        (
+          await axios.get(i.url, {
+            responseType: "arraybuffer"
+          })
+        ).data;
+
+      fs.writeFileSync(
+        pathFile,
+        Buffer.from(data)
+      );
+
+      filePaths.push(pathFile);
+
+      msg.attachment.push(
+        fs.createReadStream(pathFile)
+      );
+
+    } catch (e) {
+
+      console.log(e);
+    }
+  }
+
+  api.sendMessage(
+    msg,
+    threadID,
+    () => {
+
+      for (const path of filePaths) {
+
+        if (fs.existsSync(path))
+          fs.unlinkSync(path);
+      }
+    },
+    messageID
+  );
 };
 
 module.exports.run = async function ({
@@ -215,17 +260,18 @@ module.exports.run = async function ({
     (await Threads.getData(threadID)).data || {};
 
   if (
-    typeof data.resend === "undefined"
-  ) {
-    data.resend = true;
-  }
+    typeof data.resend === "undefined" ||
+    data.resend === false
+  )
 
-  else {
-    data.resend = !data.resend;
-  }
+    data.resend = true;
+
+  else
+
+    data.resend = false;
 
   await Threads.setData(
-    threadID,
+    parseInt(threadID),
     { data }
   );
 
