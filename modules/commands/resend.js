@@ -1,21 +1,14 @@
-const fs = require("fs-extra");
-const axios = require("axios");
-
 module.exports.config = {
   name: "resend",
-  version: "3.1.0",
+  version: "4.0.0",
   hasPermssion: 1,
-  credits: "Thọ & Mod By DuyVuong + Edited",
-  description: "Resend unsent messages with attachments",
+  credits: "Thọ & Edited",
+  description: "Resend unsent text messages",
   usePrefix: true,
   commandCategory: "general",
   usages: "resend",
   cooldowns: 0,
-  hide: true,
-  dependencies: {
-    "fs-extra": "",
-    axios: ""
-  }
+  hide: true
 };
 
 module.exports.handleEvent = async function ({
@@ -52,12 +45,14 @@ module.exports.handleEvent = async function ({
     if (threadData.resend === false)
       return;
 
-    // SAVE MESSAGE
-    if (event.type !== "message_unsend") {
+    // SAVE TEXT MESSAGE ONLY
+    if (
+      event.type !== "message_unsend" &&
+      body
+    ) {
 
       global.logMessage.set(messageID, {
-        body: body || "",
-        attachments: event.attachments || [],
+        body,
         senderID
       });
 
@@ -65,106 +60,26 @@ module.exports.handleEvent = async function ({
     }
 
     // DETECT UNSEND
-    const msgData =
-      global.logMessage.get(messageID);
+    if (event.type === "message_unsend") {
 
-    if (!msgData)
-      return;
+      const msgData =
+        global.logMessage.get(messageID);
 
-    const name =
-      await Users.getNameUser(senderID);
+      if (!msgData)
+        return;
 
-    // NO ATTACHMENT
-    if (
-      !msgData.attachments ||
-      msgData.attachments.length === 0
-    ) {
+      const name =
+        await Users.getNameUser(senderID);
 
       return api.sendMessage(
 `🚨 MESSAGE UNSENT
 
 👤 ${name}
 
-💬 ${msgData.body || "No text"}`,
+💬 ${msgData.body}`,
         threadID
       );
     }
-
-    // WITH ATTACHMENTS
-    let attachments = [];
-
-    for (let i = 0; i < msgData.attachments.length; i++) {
-
-      try {
-
-        const file =
-          msgData.attachments[i];
-
-        if (!file.url)
-          continue;
-
-        const ext =
-          file.type === "photo"
-            ? "jpg"
-            : file.type === "video"
-            ? "mp4"
-            : file.type === "audio"
-            ? "mp3"
-            : "bin";
-
-        const filePath =
-          `${__dirname}/cache/${Date.now()}_${i}.${ext}`;
-
-        // DOWNLOAD STREAM
-        const response = await axios({
-          url: file.url,
-          method: "GET",
-          responseType: "stream"
-        });
-
-        // SAVE FILE
-        await new Promise((resolve, reject) => {
-
-          const writer =
-            fs.createWriteStream(filePath);
-
-          response.data.pipe(writer);
-
-          writer.on("finish", resolve);
-          writer.on("error", reject);
-
-        });
-
-        attachments.push(
-          fs.createReadStream(filePath)
-        );
-
-      } catch (err) {
-
-        console.log(
-          "Attachment Error:",
-          err.message
-        );
-
-      }
-    }
-
-    // SEND RESEND MESSAGE
-    return api.sendMessage(
-      {
-        body:
-`🚨 MESSAGE UNSENT
-
-👤 ${name}
-
-📎 ${attachments.length} Attachment(s)
-
-💬 ${msgData.body || "No text"}`,
-
-        attachment: attachments
-      },
-      threadID
-    );
 
   } catch (e) {
 
