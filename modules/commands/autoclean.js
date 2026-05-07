@@ -1,9 +1,6 @@
 const { setData, getData } = require("../../database.js");
 
-// ── SETTINGS ─────────────────────────────
-const OWNER_ID = "61559999326713";
-
-// ── PARSE TIME ───────────────────────────
+// ── PARSE DURATION ─────────────────────────────
 function parseDuration(str) {
 
   const match =
@@ -19,39 +16,39 @@ function parseDuration(str) {
     match[2];
 
   if (unit === "m")
-    return num * 60000;
+    return num * 60 * 1000;
 
   if (unit === "h")
-    return num * 3600000;
+    return num * 60 * 60 * 1000;
 
   if (unit === "d")
-    return num * 86400000;
+    return num * 24 * 60 * 60 * 1000;
 
   return null;
 }
 
-// ── FORMAT TIME ──────────────────────────
+// ── FORMAT TIME ───────────────────────────────
 function formatTime(ms) {
 
   if (ms <= 0)
     return "0s";
 
-  const s =
+  const sec =
     Math.floor(ms / 1000) % 60;
 
-  const m =
-    Math.floor(ms / 60000) % 60;
+  const min =
+    Math.floor(ms / (1000 * 60)) % 60;
 
-  const h =
-    Math.floor(ms / 3600000) % 24;
+  const hr =
+    Math.floor(ms / (1000 * 60 * 60)) % 24;
 
-  const d =
-    Math.floor(ms / 86400000);
+  const day =
+    Math.floor(ms / (1000 * 60 * 60 * 24));
 
-  return `${d ? d + "d " : ""}${h ? h + "h " : ""}${m ? m + "m " : ""}${s}s`;
+  return `${day > 0 ? day + "d " : ""}${hr > 0 ? hr + "h " : ""}${min > 0 ? min + "m " : ""}${sec}s`;
 }
 
-// ── GET USERNAME ─────────────────────────
+// ── GET USER NAME ─────────────────────────────
 async function getUserName(uid, api) {
 
   try {
@@ -61,16 +58,52 @@ async function getUserName(uid, api) {
 
     return (
       info?.[uid]?.name ||
-      `User ${uid}`
+      `FB-USER`
     );
 
   } catch {
 
-    return `User ${uid}`;
+    return `FB-USER`;
+
   }
 }
 
-// ── KICK SYSTEM ──────────────────────────
+// ── FORMAT LIST ───────────────────────────────
+async function formatList(uids, api) {
+
+  if (!uids || uids.length === 0)
+    return "None";
+
+  let text = "";
+
+  for (const uid of uids) {
+
+    const name =
+      await getUserName(uid, api);
+
+    text +=
+`┃ • ${name}
+`;
+  }
+
+  return text;
+}
+
+// ── CONFIG ────────────────────────────────────
+module.exports.config = {
+  name: "autoclean",
+  version: "6.0.0",
+  hasPermission: 1,
+  credits: "ChatGPT + NN",
+  description:
+    "Auto kick inactive members",
+  commandCategory: "group",
+  usages:
+    "/autoclean 1m|1h|1d",
+  cooldowns: 5
+};
+
+// ── AUTO KICK ─────────────────────────────────
 async function kickInactiveMembers(
   api,
   threadID
@@ -85,77 +118,76 @@ async function kickInactiveMembers(
     return;
 
   const botID =
-    api.getCurrentUserID();
-
-  const info =
-    await api.getThreadInfo(
-      threadID
+    String(
+      api.getCurrentUserID()
     );
 
-  const inactive =
-    data.totalUsers.filter(uid =>
+  const ownerID =
+    "61559999326713";
 
-      !data.activeUsers.includes(uid) &&
-      uid !== botID &&
-      uid !== OWNER_ID &&
-      !info.adminIDs.some(
-        a => a.id == uid
-      )
-    );
+  api.getThreadInfo(
+    threadID,
+    async (err, info) => {
 
-  let kicked = 0;
+      if (err)
+        return;
 
-  for (const uid of inactive) {
+      const inactive =
+        data.totalUsers.filter(
+          uid =>
 
-    try {
+            !data.activeUsers.includes(uid) &&
 
-      await api.removeUserFromGroup(
-        uid,
-        threadID
+            uid !== botID &&
+
+            uid !== ownerID &&
+
+            !info.adminIDs.some(
+              a => a.id == uid
+            )
+        );
+
+      // kick users
+      for (const uid of inactive) {
+
+        try {
+
+          await api.removeUserFromGroup(
+            uid,
+            threadID
+          );
+
+        } catch {}
+      }
+
+      // delete data
+      await setData(
+        `/autoclean/${threadID}`,
+        null
       );
 
-      kicked++;
+      return api.sendMessage(
 
-    } catch {}
-  }
+`╭───────────────⭓
+│ 🧹 AUTO CLEAN FINISHED
+├───────────────⭔
+│ 👥 Active:
+│ ${data.activeUsers.length}
+│
+│ 🚫 Kicked:
+│ ${inactive.length}
+│
+│ 📊 Total Members:
+│ ${data.totalUsers.length}
+╰───────────────⭓`,
 
-  await setData(
-    `/autoclean/${threadID}`,
-    null
-  );
-
-  return api.sendMessage(
-
-`╭━━━━━━━━━━━━━━━╮
-┃ 🧹 AUTO CLEAN DONE
-┣━━━━━━━━━━━━━━━┫
-┃ ✅ Active:
-┃ ${data.activeUsers.length}
-┃
-┃ ❌ Kicked:
-┃ ${kicked}
-┃
-┃ 👥 Total Members:
-┃ ${data.totalUsers.length}
-╰━━━━━━━━━━━━━━━╯`,
-
-    threadID
+        threadID
+      );
+    }
   );
 }
 
-// ── COMMAND ──────────────────────────────
-module.exports.config = {
-  name: "autoclean",
-  version: "6.0.0",
-  hasPermission: 1,
-  credits: "ChatGPT",
-  description: "Auto remove inactive members",
-  commandCategory: "Group",
-  usages:
-    "/autoclean 1m|1h|1d",
-  cooldowns: 5
-};
-
+// ── COMMAND ───────────────────────────────────
 module.exports.run =
 async function ({
   api,
@@ -165,9 +197,12 @@ async function ({
 
   const {
     threadID,
-    senderID,
-    messageID
+    messageID,
+    senderID
   } = event;
+
+  const ownerID =
+    "61559999326713";
 
   const info =
     await api.getThreadInfo(
@@ -179,20 +214,20 @@ async function ({
       a => a.id == senderID
     );
 
-  // admin only
+  // admin check
   if (
-    senderID !== OWNER_ID &&
+    senderID !== ownerID &&
     !isAdmin
   ) {
 
     return api.sendMessage(
 
-`╭━━━━━━━━━━━━━━━╮
-┃ ❌ ACCESS DENIED
-┣━━━━━━━━━━━━━━━┫
-┃ Only GC admins
-┃ can use this.
-╰━━━━━━━━━━━━━━━╯`,
+`╭───────────────⭓
+│ ❌ ACCESS DENIED
+├───────────────⭔
+│ Only group admins
+│ can use this command.
+╰───────────────⭓`,
 
       threadID,
       messageID
@@ -204,24 +239,25 @@ async function ({
 
     return api.sendMessage(
 
-`╭━━━━━━━━━━━━━━━╮
-┃ 🧹 AUTO CLEAN
-┣━━━━━━━━━━━━━━━┫
-┃ 📌 /autoclean 1m
-┃ 📌 /autoclean 1h
-┃ 📌 /autoclean 1d
-┃
-┃ 📌 /autoclean list
-┃ 📌 /autoclean cancel
-┃ 📌 /autoclean kick
-╰━━━━━━━━━━━━━━━╯`,
+`╭───────────────⭓
+│ 🧹 AUTO CLEAN
+├───────────────⭔
+│ 📌 /autoclean 1m
+│ 📌 /autoclean 1h
+│ 📌 /autoclean 1d
+│
+│ 📌 /autoclean list
+│ 📌 /autoclean resend
+│ 📌 /autoclean cancel
+│ 📌 /autoclean startkick
+╰───────────────⭓`,
 
       threadID,
       messageID
     );
   }
 
-  const option =
+  const sub =
     args[0].toLowerCase();
 
   let data =
@@ -229,8 +265,8 @@ async function ({
       `/autoclean/${threadID}`
     );
 
-  // ── CANCEL ─────────────────────
-  if (option === "cancel") {
+  // ── CANCEL ───────────────────────
+  if (sub === "cancel") {
 
     await setData(
       `/autoclean/${threadID}`,
@@ -239,70 +275,32 @@ async function ({
 
     return api.sendMessage(
 
-`╭━━━━━━━━━━━━━━━╮
-┃ 🛑 AUTO CLEAN
-┣━━━━━━━━━━━━━━━┫
-┃ Event cancelled.
-╰━━━━━━━━━━━━━━━╯`,
+`╭───────────────⭓
+│ 🛑 AUTO CLEAN STOPPED
+├───────────────⭔
+│ Auto clean has been
+│ cancelled successfully.
+╰───────────────⭓`,
 
       threadID,
       messageID
     );
   }
 
-  // ── LIST ───────────────────────
-  if (option === "list") {
+  // ── START KICK ───────────────────
+  if (sub === "startkick") {
 
     if (!data) {
 
       return api.sendMessage(
 
-`╭━━━━━━━━━━━━━━━╮
-┃ ⚠️ NO ACTIVE EVENT
-╰━━━━━━━━━━━━━━━╯`,
+`╭───────────────⭓
+│ ⚠️ NO ACTIVE SESSION
+├───────────────⭔
+│ No active auto clean
+│ found in this group.
+╰───────────────⭓`,
 
-        threadID,
-        messageID
-      );
-    }
-
-    const inactive =
-      data.totalUsers.filter(
-        uid =>
-          !data.activeUsers.includes(uid)
-      );
-
-    let msg =
-
-`╭━━━━━━━━━━━━━━━╮
-┃ 📋 AUTO CLEAN
-┣━━━━━━━━━━━━━━━┫
-┃ ✅ Active:
-┃ ${data.activeUsers.length}
-┃
-┃ ❌ Inactive:
-┃ ${inactive.length}
-┃
-┃ ⏳ Remaining:
-┃ ${formatTime(
-  data.endTime - Date.now()
-)}
-╰━━━━━━━━━━━━━━━╯`;
-
-    return api.sendMessage(
-      msg,
-      threadID,
-      messageID
-    );
-  }
-
-  // ── FORCE KICK ─────────────────
-  if (option === "kick") {
-
-    if (!data) {
-
-      return api.sendMessage(
-        "⚠️ No active event.",
         threadID,
         messageID
       );
@@ -314,20 +312,116 @@ async function ({
     );
   }
 
-  // ── START ──────────────────────
+  // ── RESEND ───────────────────────
+  if (sub === "resend") {
+
+    if (!data) {
+
+      return api.sendMessage(
+
+`╭───────────────⭓
+│ ⚠️ NO ACTIVE SESSION
+├───────────────⭔
+│ No active auto clean
+│ found in this group.
+╰───────────────⭓`,
+
+        threadID,
+        messageID
+      );
+    }
+
+    const remaining =
+      data.endTime - Date.now();
+
+    return api.sendMessage(
+
+`╭───────────────⭓
+│ 🧹 AUTO CLEAN ACTIVE
+├───────────────⭔
+│ 👥 Active:
+│ ${data.activeUsers.length}
+│
+│ 👤 Total:
+│ ${data.totalUsers.length}
+│
+│ ⏳ Remaining:
+│ ${formatTime(remaining)}
+╰───────────────⭓`,
+
+      threadID,
+      messageID
+    );
+  }
+
+  // ── LIST ─────────────────────────
+  if (sub === "list") {
+
+    if (!data) {
+
+      return api.sendMessage(
+
+`╭───────────────⭓
+│ ⚠️ NO ACTIVE SESSION
+├───────────────⭔
+│ No active auto clean
+│ found in this group.
+╰───────────────⭓`,
+
+        threadID,
+        messageID
+      );
+    }
+
+    const active =
+      await formatList(
+        data.activeUsers,
+        api
+      );
+
+    const inactive =
+      await formatList(
+        data.totalUsers.filter(
+          uid =>
+            !data.activeUsers.includes(uid)
+        ),
+        api
+      );
+
+    return api.sendMessage(
+
+`╭───────────────⭓
+│ 📋 AUTO CLEAN LIST
+├───────────────⭔
+│ ✅ ACTIVE USERS
+${active}
+│
+│ 🚫 INACTIVE USERS
+${inactive}
+╰───────────────⭓`,
+
+      threadID,
+      messageID
+    );
+  }
+
+  // ── START ────────────────────────
   const duration =
-    parseDuration(option);
+    parseDuration(sub);
 
   if (!duration) {
 
     return api.sendMessage(
 
-`╭━━━━━━━━━━━━━━━╮
-┃ ❌ INVALID TIME
-┣━━━━━━━━━━━━━━━┫
-┃ Example:
-┃ 1m / 1h / 1d
-╰━━━━━━━━━━━━━━━╯`,
+`╭───────────────⭓
+│ ❌ INVALID TIME
+├───────────────⭔
+│ Use only:
+│
+│ • 1m
+│ • 1h
+│ • 1d
+╰───────────────⭓`,
 
       threadID,
       messageID
@@ -337,12 +431,12 @@ async function ({
   const members =
     info.participantIDs;
 
-  const endTime =
-    Date.now() + duration;
-
   data = {
-    endTime,
+    endTime:
+      Date.now() + duration,
+
     activeUsers: [],
+
     totalUsers: members
   };
 
@@ -353,18 +447,19 @@ async function ({
 
   api.sendMessage(
 
-`╭━━━━━━━━━━━━━━━╮
-┃ 🧹 AUTO CLEAN STARTED
-┣━━━━━━━━━━━━━━━┫
-┃ 👥 Members:
-┃ ${members.length}
-┃
-┃ ⏳ Duration:
-┃ ${formatTime(duration)}
-┃
-┃ 💬 Send message
-┃ to stay safe.
-╰━━━━━━━━━━━━━━━╯`,
+`╭───────────────⭓
+│ 🧹 AUTO CLEAN STARTED
+├───────────────⭔
+│ 👥 Total Members:
+│ ${members.length}
+│
+│ ⏳ Duration:
+│ ${formatTime(duration)}
+│
+│ 📌 Members must
+│ send a message
+│ to stay active.
+╰───────────────⭓`,
 
     threadID
   );
@@ -380,83 +475,75 @@ async function ({
   }, duration);
 };
 
-// ── AUTO TRACK ───────────────────────────
+// ── HANDLE EVENT ─────────────────────────────
 module.exports.handleEvent =
 async function ({
   api,
   event
 }) {
 
-  try {
+  const {
+    threadID,
+    senderID,
+    body
+  } = event;
 
-    const {
-      threadID,
-      senderID,
-      type
-    } = event;
+  if (!body)
+    return;
 
-    if (
-      type !== "message"
-    ) return;
-
-    let data =
-      await getData(
-        `/autoclean/${threadID}`
-      );
-
-    if (!data)
-      return;
-
-    if (
-      !Array.isArray(
-        data.activeUsers
-      )
-    ) {
-
-      data.activeUsers = [];
-    }
-
-    // already active
-    if (
-      data.activeUsers.includes(
-        senderID
-      )
-    ) return;
-
-    // add active
-    data.activeUsers.push(
-      senderID
+  let data =
+    await getData(
+      `/autoclean/${threadID}`
     );
 
-    await setData(
-      `/autoclean/${threadID}`,
-      data
-    );
+  if (!data)
+    return;
 
-    const name =
-      await getUserName(
-        senderID,
-        api
-      );
+  if (
+    !Array.isArray(
+      data.activeUsers
+    )
+  ) {
 
-    return api.sendMessage(
-
-`╭━━━━━━━━━━━━━━━╮
-┃ ✅ ACTIVE REGISTERED
-┣━━━━━━━━━━━━━━━┫
-┃ 👤 ${name}
-┃
-┃ 🛡️ Safe from kick.
-╰━━━━━━━━━━━━━━━╯`,
-
-      threadID
-    );
-
-  } catch (e) {
-
-    console.log(
-      "AUTOCLEAN ERROR:",
-      e
-    );
+    data.activeUsers = [];
   }
+
+  // already active
+  if (
+    data.activeUsers.includes(
+      senderID
+    )
+  ) return;
+
+  data.activeUsers.push(
+    senderID
+  );
+
+  await setData(
+    `/autoclean/${threadID}`,
+    data
+  );
+
+  const name =
+    await getUserName(
+      senderID,
+      api
+    );
+
+  return api.sendMessage(
+
+`╭───────────────⭓
+│ ✅ USER REGISTERED
+├───────────────⭔
+│ 👤 ${name}
+│ is now marked
+│ as active.
+│
+│ 📊 Active:
+│ ${data.activeUsers.length}
+│ / ${data.totalUsers.length}
+╰───────────────⭓`,
+
+    threadID
+  );
 };
