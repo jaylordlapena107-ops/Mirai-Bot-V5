@@ -1,5 +1,5 @@
 const axios = require("axios");
-const { getData, setData } = require("../../database.js");
+const { getData, setData } = require("../../../database.js");
 
 // ── CONFIG ─────────────────────────────────────────────
 const AI_NAME = "BARKADA AI";
