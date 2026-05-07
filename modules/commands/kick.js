@@ -1,6 +1,6 @@
 module.exports.config = {
     name: "kick",
-    version: "2.0.0",
+    version: "2.1.0",
     hasPermssion: 0,
     credits: "ChatGPT",
     description: "Kick mentioned member",
@@ -37,7 +37,12 @@ module.exports.run = async function ({
     if (!isAdmin) {
 
         return api.sendMessage(
-            `⚠️ Only group admins can use this command.`,
+`╭───────────────⭓
+│ ⚠️ ACCESS DENIED
+├───────────────⭔
+│ Only group admins
+│ can use this command.
+╰───────────────⭓`,
             threadID
         );
     }
@@ -49,7 +54,26 @@ module.exports.run = async function ({
     if (!mentionID) {
 
         return api.sendMessage(
-            `⚠️ Please mention a user to kick.`,
+`╭───────────────⭓
+│ ⚠️ INVALID USAGE
+├───────────────⭔
+│ Please mention
+│ a user to kick.
+╰───────────────⭓`,
+            threadID
+        );
+    }
+
+    // ── PREVENT SELF KICK ────────────────────────────
+    if (mentionID == senderID) {
+
+        return api.sendMessage(
+`╭───────────────⭓
+│ ⚠️ ACTION BLOCKED
+├───────────────⭔
+│ You cannot kick
+│ yourself.
+╰───────────────⭓`,
             threadID
         );
     }
@@ -58,7 +82,12 @@ module.exports.run = async function ({
     if (mentionID == PROTECTED_ID) {
 
         return api.sendMessage(
-            `⚠️ You cannot remove the bot owner.`,
+`╭───────────────⭓
+│ 👑 PROTECTED USER
+├───────────────⭔
+│ You cannot remove
+│ the bot owner.
+╰───────────────⭓`,
             threadID
         );
     }
@@ -76,7 +105,13 @@ module.exports.run = async function ({
         );
 
         return api.sendMessage(
-            `✅ ${userName} has been removed from the group.`,
+`╭───────────────⭓
+│ ✅ MEMBER REMOVED
+├───────────────⭔
+│ 👤 ${userName}
+│ has been removed
+│ from the group.
+╰───────────────⭓`,
             threadID
         );
 
@@ -85,7 +120,12 @@ module.exports.run = async function ({
         console.log(e);
 
         return api.sendMessage(
-            `❌ Failed to remove user.\nMake sure the bot is admin.`,
+`╭───────────────⭓
+│ ❌ REMOVE FAILED
+├───────────────⭔
+│ Make sure the bot
+│ is group admin.
+╰───────────────⭓`,
             threadID
         );
     }
