@@ -1,6 +1,6 @@
 module.exports.config = {
     name: "autoIp",
-    version: "1.0.0",
+    version: "1.2.0",
     hasPermssion: 0,
     credits: "ChatGPT",
     description: "Auto reply server IP when someone types ip",
@@ -25,8 +25,19 @@ module.exports.handleEvent = async function ({
     const text =
         body.toLowerCase().trim();
 
-    // detect exact "ip" only
-    if (text !== "ip")
+    // detect "ip" as separate word only
+    // examples:
+    // ✅ ip
+    // ✅ ano ip
+    // ✅ send ip
+    // ❌ flip
+    // ❌ clip
+    // ❌ sniper
+
+    const hasIp =
+        /\bip\b/.test(text);
+
+    if (!hasIp)
         return;
 
     return api.sendMessage(
