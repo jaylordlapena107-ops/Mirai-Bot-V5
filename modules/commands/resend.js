@@ -1,8 +1,8 @@
 module.exports.config = {
   name: "resend",
-  version: "2.1.0",
+  version: "2.2.0",
   hasPermssion: 1,
-  credits: "Thọ & Mod By DuyVuong + Edited",
+  credits: "Thọ & Mod By DuyVuong + Fixed",
   description: "Resends Messages",
   usePrefix: true,
   commandCategory: "general",
@@ -19,7 +19,6 @@ module.exports.config = {
 module.exports.handleEvent = async function ({
   event,
   api,
-  client,
   Users,
   Threads
 }) {
@@ -32,14 +31,16 @@ module.exports.handleEvent = async function ({
 
   const {
     writeFileSync,
-    createReadStream
+    createReadStream,
+    existsSync,
+    mkdirSync
   } = global.nodemodule["fs-extra"];
 
-  let {
+  const {
     messageID,
     senderID,
     threadID,
-    body: content
+    body
   } = event;
 
   if (!global.logMessage)
@@ -49,26 +50,37 @@ module.exports.handleEvent = async function ({
     global.data.botID =
       api.getCurrentUserID();
 
-  // thread settings
-  const thread =
-    global.data.threadData.get(
-      parseInt(threadID)
-    ) || {};
-
-  // resend off
-  if (
-    typeof thread["resend"] !=
-      "undefined" &&
-    thread["resend"] == false
-  ) return;
-
   // ignore bot
   if (
     senderID ==
     global.data.botID
   ) return;
 
-  // save message
+  // thread data
+  const threadData =
+    (
+      await Threads.getData(
+        threadID
+      )
+    ).data || {};
+
+  // resend off
+  if (
+    typeof threadData.resend !=
+      "undefined" &&
+    threadData.resend == false
+  ) return;
+
+  // create cache folder
+  const cachePath =
+    __dirname + "/cache";
+
+  if (!existsSync(cachePath))
+    mkdirSync(cachePath, {
+      recursive: true
+    });
+
+  // SAVE MESSAGE
   if (
     event.type !=
     "message_unsend"
@@ -78,21 +90,23 @@ module.exports.handleEvent = async function ({
       messageID,
       {
         msgBody:
-          content || "",
+          body || "",
 
         attachment:
-          event.attachments || [],
+          event.attachments || []
       }
     );
+
+    return;
   }
 
-  // detect unsend
+  // UNSEND
   if (
     event.type ==
     "message_unsend"
   ) {
 
-    var getMsg =
+    const getMsg =
       global.logMessage.get(
         messageID
       );
@@ -100,15 +114,16 @@ module.exports.handleEvent = async function ({
     if (!getMsg)
       return;
 
-    let name =
+    const name =
       await Users.getNameUser(
         senderID
       );
 
     // no attachment
     if (
-      getMsg.attachment[0] ==
-      undefined
+      !getMsg.attachment ||
+      getMsg.attachment.length ==
+        0
     ) {
 
       return api.sendMessage(
@@ -123,13 +138,9 @@ ${getMsg.msgBody || "No text"}`,
     }
 
     // with attachment
-    else {
+    let msg = {
 
-      let num = 0;
-
-      let msg = {
-
-        body:
+      body:
 `🚨 MESSAGE UNSENT
 
 👤 Name: ${name}
@@ -140,71 +151,67 @@ ${getMsg.attachment.length}
 💬 Content:
 ${getMsg.msgBody || "No text"}`,
 
-        attachment: [],
+      attachment: []
+    };
 
-        mentions: [{
-          tag: name,
-          id: senderID
-        }]
-      };
+    let num = 0;
 
-      for (var i of getMsg.attachment) {
+    for (const file of getMsg.attachment) {
 
-        try {
+      try {
 
-          num += 1;
+        num++;
 
-          var getURL =
-            await request.get(
-              i.url
-            );
+        const getURL =
+          await request.get(
+            file.url
+          );
 
-          var pathname =
-            getURL.uri.pathname;
+        const pathname =
+          getURL.uri.pathname;
 
-          var ext =
-            pathname.substring(
-              pathname.lastIndexOf(".") + 1
-            );
+        const ext =
+          pathname.substring(
+            pathname.lastIndexOf(".") + 1
+          );
 
-          var path =
-            __dirname +
-            `/cache/${Date.now()}_${num}.${ext}`;
+        const filePath =
+          __dirname +
+          `/cache/${Date.now()}_${num}.${ext}`;
 
-          var data =
-            (
-              await axios.get(
-                i.url,
-                {
-                  responseType:
-                    "arraybuffer"
-                }
-              )
-            ).data;
-
-          writeFileSync(
-            path,
-            Buffer.from(
-              data,
-              "utf-8"
+        const data =
+          (
+            await axios.get(
+              file.url,
+              {
+                responseType:
+                  "arraybuffer"
+              }
             )
-          );
+          ).data;
 
-          msg.attachment.push(
-            createReadStream(path)
-          );
+        writeFileSync(
+          filePath,
+          Buffer.from(data)
+        );
 
-        } catch (e) {
+        msg.attachment.push(
+          createReadStream(filePath)
+        );
 
-          console.log(e);
-        }
+      } catch (e) {
+
+        console.log(
+          "[RESEND ERROR]",
+          e.message
+        );
       }
-
-      api.sendMessage(
-        msg,
-        threadID
-      );
     }
+
+    return api.sendMessage(
+      msg,
+      threadID
+    );
   }
 };
 
@@ -219,24 +226,24 @@ module.exports.run = async function ({
     messageID
   } = event;
 
-  var data =
+  const data =
     (
       await Threads.getData(
         threadID
       )
-    ).data;
+    ).data || {};
 
   if (
-    typeof data["resend"] ==
+    typeof data.resend ==
       "undefined" ||
-    data["resend"] == false
+    data.resend == false
   )
 
-    data["resend"] = true;
+    data.resend = true;
 
   else
 
-    data["resend"] = false;
+    data.resend = false;
 
   await Threads.setData(
     parseInt(threadID),
@@ -250,7 +257,7 @@ module.exports.run = async function ({
 
   return api.sendMessage(
     `Resend is now ${
-      data["resend"] == true
+      data.resend
         ? "ON ✅"
         : "OFF ❌"
     }`,
