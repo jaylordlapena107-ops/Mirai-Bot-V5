@@ -8,23 +8,33 @@ const fs = require('fs-extra');
 const path = require('path');
 const axios = require('axios');
 
-const TEMP_DIR = path.join(process.cwd(), 'utils/data/welcome_voice_temp');
+const TEMP_DIR = path.join(
+  process.cwd(),
+  'utils/data/welcome_voice_temp'
+);
+
 fs.ensureDirSync(TEMP_DIR);
 
 module.exports.config = {
   name: 'joinNoti',
   eventType: ['log:subscribe'],
-  version: '4.0.0',
+  version: '5.0.0',
   credits: 'Mirai Team | TEAM STARTCOPE BETA',
   description: 'Welcome new members with image + voice',
 };
 
-// ── Generate Voice ────────────────────────────────────
-async function generateWelcomeVoice(firstNames, threadName) {
+// ── GENERATE VOICE ────────────────────────────────────
+async function generateWelcomeVoice(
+  firstNames,
+  threadName
+) {
 
   try {
 
-    const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
+    const {
+      MsEdgeTTS,
+      OUTPUT_FORMAT
+    } = require('msedge-tts');
 
     const tts = new MsEdgeTTS();
 
@@ -43,7 +53,7 @@ async function generateWelcomeVoice(firstNames, threadName) {
 
     const fp = path.join(
       TEMP_DIR,
-      `welcome_${Date.now()}.mp3`
+      `welcome_voice_${Date.now()}.mp3`
     );
 
     const { audioStream } =
@@ -53,7 +63,10 @@ async function generateWelcomeVoice(firstNames, threadName) {
 
       const chunks = [];
 
-      audioStream.on('data', c => chunks.push(c));
+      audioStream.on(
+        'data',
+        chunk => chunks.push(chunk)
+      );
 
       audioStream.on('end', () => {
 
@@ -93,7 +106,7 @@ module.exports.run = async function ({
 
   const { threadID } = event;
 
-  // ── Bot Added ───────────────────────────────────────
+  // ── BOT ADDED ───────────────────────────────────────
   if (
     event.logMessageData.addedParticipants.some(
       p => p.userFbId == api.getCurrentUserID()
@@ -115,7 +128,7 @@ module.exports.run = async function ({
     );
   }
 
-  // ── User Joined ─────────────────────────────────────
+  // ── USER JOINED ─────────────────────────────────────
   try {
 
     const {
@@ -124,9 +137,11 @@ module.exports.run = async function ({
     } = await api.getThreadInfo(threadID);
 
     const safeThreadName =
-      threadName
-        ?.replace(/[^\x20-\x7E]/g, '')
-        ?.trim() || 'Group Chat';
+      String(threadName || 'Group Chat')
+        .replace(/[^\x20-\x7E]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 40) || 'Group Chat';
 
     const nameArray = [];
     const mentions = [];
@@ -147,6 +162,7 @@ module.exports.run = async function ({
         participantIDs.length - i++
       );
 
+      // save user data
       if (
         !global.data.allUserID.includes(
           String(p.userFbId)
@@ -170,20 +186,19 @@ module.exports.run = async function ({
     const firstUser =
       event.logMessageData.addedParticipants[0];
 
-    // ── Generate Welcome Image ────────────────────────
+    // ── WELCOME IMAGE ─────────────────────────────────
     try {
 
-      const avatar =
+      const avatarUrl =
         `https://graph.facebook.com/${firstUser.userFbId}/picture?width=512&height=512`;
 
-      const apiUrl =
-        `https://jrm-api.vercel.app/canvas/greetings2` +
-        `?type=welcome` +
-        `&avatar=${encodeURIComponent(avatar)}` +
-        `&username=${encodeURIComponent(nameArray.join(', '))}` +
-        `&bg=${encodeURIComponent('https://i.imgur.com/YzgoR04.png')}` +
+      const welcomeAPI =
+        `https://urangkapolka.vercel.app/api/welcome` +
+        `?username=${encodeURIComponent(nameArray.join(', '))}` +
+        `&avatarUrl=${encodeURIComponent(avatarUrl)}` +
         `&groupname=${encodeURIComponent(safeThreadName)}` +
-        `&member=${encodeURIComponent(memLengths[0])}`;
+        `&bg=${encodeURIComponent('https://i.imgur.com/YzgoR04.png')}` +
+        `&memberCount=${encodeURIComponent(memLengths[0])}`;
 
       const imgPath = path.join(
         TEMP_DIR,
@@ -191,7 +206,7 @@ module.exports.run = async function ({
       );
 
       const response = await axios({
-        url: apiUrl,
+        url: welcomeAPI,
         method: 'GET',
         responseType: 'stream'
       });
@@ -202,15 +217,21 @@ module.exports.run = async function ({
       response.data.pipe(writer);
 
       await new Promise((resolve, reject) => {
+
         writer.on('finish', resolve);
         writer.on('error', reject);
       });
 
-      // send image only
+      // SEND IMAGE
       api.sendMessage(
         {
+          body:
+            `👋 Welcome ${nameArray.join(', ')}!\n` +
+            `🎉 Welcome to ${safeThreadName}\n` +
+            `🔢 Member #${memLengths[0]}`,
           attachment:
-            fs.createReadStream(imgPath)
+            fs.createReadStream(imgPath),
+          mentions
         },
         threadID,
         () => {
@@ -232,9 +253,9 @@ module.exports.run = async function ({
       );
     }
 
-    // ── Voice Welcome ─────────────────────────────────
-    const firstNames = nameArray.map(n =>
-      n
+    // ── VOICE WELCOME ─────────────────────────────────
+    const firstNames = nameArray.map(name =>
+      name
         .replace(/[^\x00-\x7F]/g, ' ')
         .trim()
         .split(/\s+/)[0] || 'friend'
