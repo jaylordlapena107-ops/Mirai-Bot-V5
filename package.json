@@ -15,7 +15,7 @@
         "@distube/ytdl-core": "^4.16.12",
         "@dongdev/fca-unofficial": "^1.0.20",
         "firebase-admin": "^12.0.0",
-        "express": "^4.19.2"
+        "express": "^4.19.2",
         "axios": "^1.16.0",
         "bluebird": "^2.11.0",
         "body-parser": "^1.20.5",
