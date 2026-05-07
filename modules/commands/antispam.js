@@ -5,7 +5,7 @@ const {
 
 module.exports.config = {
   name: "spamkick",
-  version: "2.0.0",
+  version: "3.0.0",
   hasPermssion: 1,
   credits: "Jaylord La Peña + ChatGPT",
   description:
@@ -187,6 +187,12 @@ async function ({
       body
     } = event;
 
+    // ── GET BOT ID ─────────────────
+    const botID =
+      String(
+        api.getCurrentUserID()
+      );
+
     // ── DEBUG ──────────────────────
     console.log(
       "[SPAM EVENT]",
@@ -200,11 +206,13 @@ async function ({
       !body
     ) return;
 
-    // ── SKIP PROTECTED ─────────────
+    // ── SKIP OWNER / BOT / PROTECTED
     if (
       PROTECTED_UIDS.includes(
         senderID
-      )
+      ) ||
+      senderID == OWNER_UID ||
+      senderID == botID
     ) return;
 
     // ── GET CONFIG ─────────────────
@@ -281,7 +289,7 @@ async function ({
       config.limit - 2
     ) {
 
-      api.sendMessage(
+      return api.sendMessage(
 
 `⚠️ Warning!
 
@@ -305,7 +313,11 @@ you will be kicked.`,
           threadID
         );
 
-        api.sendMessage(
+        delete spamCache[
+          threadID
+        ][senderID];
+
+        return api.sendMessage(
 
 `🚨 User kicked for spamming.`,
 
@@ -319,7 +331,7 @@ you will be kicked.`,
           e
         );
 
-        api.sendMessage(
+        return api.sendMessage(
 
 `❌ Failed to kick user.
 Make sure bot is admin.`,
@@ -327,9 +339,6 @@ Make sure bot is admin.`,
           threadID
         );
       }
-
-      // RESET
-      userData.count = 0;
     }
 
   } catch (e) {
