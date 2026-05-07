@@ -1,20 +1,18 @@
 const fs = require("fs-extra");
 const axios = require("axios");
-const request = require("request");
 
 module.exports.config = {
   name: "resend",
-  version: "3.0.0",
+  version: "3.1.0",
   hasPermssion: 1,
   credits: "Thọ & Mod By DuyVuong + Edited",
-  description: "Resend unsent messages",
+  description: "Resend unsent messages with attachments",
   usePrefix: true,
   commandCategory: "general",
   usages: "resend",
   cooldowns: 0,
   hide: true,
   dependencies: {
-    request: "",
     "fs-extra": "",
     axios: ""
   }
@@ -42,15 +40,15 @@ module.exports.handleEvent = async function ({
     if (!global.data.botID)
       global.data.botID = api.getCurrentUserID();
 
-    // ignore bot messages
+    // Ignore bot messages
     if (senderID == global.data.botID)
       return;
 
-    // thread settings
+    // Thread settings
     const threadData =
       (await Threads.getData(threadID)).data || {};
 
-    // resend off
+    // Resend OFF
     if (threadData.resend === false)
       return;
 
@@ -66,7 +64,7 @@ module.exports.handleEvent = async function ({
       return;
     }
 
-    // UNSEND DETECTED
+    // DETECT UNSEND
     const msgData =
       global.logMessage.get(messageID);
 
@@ -83,59 +81,75 @@ module.exports.handleEvent = async function ({
     ) {
 
       return api.sendMessage(
-        `🚨 MESSAGE UNSENT\n\n👤 ${name}\n\n💬 ${msgData.body || "No text"}`,
+`🚨 MESSAGE UNSENT
+
+👤 ${name}
+
+💬 ${msgData.body || "No text"}`,
         threadID
       );
     }
 
-    // WITH ATTACHMENT
-    let files = [];
+    // WITH ATTACHMENTS
+    let attachments = [];
 
     for (let i = 0; i < msgData.attachments.length; i++) {
 
       try {
 
-        const attachment =
+        const file =
           msgData.attachments[i];
 
-        if (!attachment.url)
+        if (!file.url)
           continue;
 
         const ext =
-          attachment.type === "photo"
+          file.type === "photo"
             ? "jpg"
-            : attachment.type === "video"
+            : file.type === "video"
             ? "mp4"
-            : attachment.type === "audio"
+            : file.type === "audio"
             ? "mp3"
             : "bin";
 
-        const path =
-          __dirname +
-          `/cache/${Date.now()}_${i}.${ext}`;
+        const filePath =
+          `${__dirname}/cache/${Date.now()}_${i}.${ext}`;
 
-        const response =
-          await axios.get(
-            attachment.url,
-            {
-              responseType: "arraybuffer"
-            }
-          );
+        // DOWNLOAD STREAM
+        const response = await axios({
+          url: file.url,
+          method: "GET",
+          responseType: "stream"
+        });
 
-        fs.writeFileSync(
-          path,
-          Buffer.from(response.data)
+        // SAVE FILE
+        await new Promise((resolve, reject) => {
+
+          const writer =
+            fs.createWriteStream(filePath);
+
+          response.data.pipe(writer);
+
+          writer.on("finish", resolve);
+          writer.on("error", reject);
+
+        });
+
+        attachments.push(
+          fs.createReadStream(filePath)
         );
 
-        files.push(
-          fs.createReadStream(path)
+      } catch (err) {
+
+        console.log(
+          "Attachment Error:",
+          err.message
         );
 
-      } catch (e) {
-        console.log(e);
       }
     }
 
+    // SEND RESEND MESSAGE
     return api.sendMessage(
       {
         body:
@@ -143,18 +157,21 @@ module.exports.handleEvent = async function ({
 
 👤 ${name}
 
-📎 ${files.length} Attachment(s)
+📎 ${attachments.length} Attachment(s)
 
 💬 ${msgData.body || "No text"}`,
 
-        attachment: files
+        attachment: attachments
       },
       threadID
     );
 
   } catch (e) {
 
-    console.log("RESEND ERROR:", e);
+    console.log(
+      "RESEND ERROR:",
+      e.message
+    );
 
   }
 };
@@ -177,14 +194,19 @@ module.exports.run = async function ({
     typeof data.resend === "undefined" ||
     data.resend === false
   ) {
+
     data.resend = true;
+
   } else {
+
     data.resend = false;
+
   }
 
-  await Threads.setData(threadID, {
-    data
-  });
+  await Threads.setData(
+    threadID,
+    { data }
+  );
 
   global.data.threadData.set(
     parseInt(threadID),
