@@ -1,14 +1,17 @@
-const { getData, setData } = require("../../database.js");
+const {
+  getData,
+  setData
+} = require("../../database.js");
 
 // ── CONFIG ─────────────────────────────
 module.exports.config = {
   name: "slot",
-  version: "1.0.0",
+  version: "2.0.0",
   hasPermssion: 0,
   credits: "ChatGPT",
   description: "Simple slot gambling game",
   commandCategory: "Games",
-  usages: "/slot <amount>",
+  usages: "/slot <amount> | on | off",
   cooldowns: 5
 };
 
@@ -96,12 +99,149 @@ async function ({
       senderID
     } = event;
 
+    const info =
+      await api.getThreadInfo(
+        threadID
+      );
+
+    const isAdmin =
+      info.adminIDs.some(
+        a => a.id == senderID
+      );
+
+    // ── GET SETTINGS ─────────────────
+    let settings =
+      await getData(
+        `slotSettings/${threadID}`
+      );
+
+    if (!settings)
+      settings = {};
+
+    // default ON
+    if (
+      typeof settings.enabled ===
+      "undefined"
+    ) {
+
+      settings.enabled = true;
+
+      await setData(
+        `slotSettings/${threadID}`,
+        settings
+      );
+    }
+
+    const sub =
+      (args[0] || "")
+      .toLowerCase();
+
+    // ── SLOT ON ─────────────────────
+    if (sub === "on") {
+
+      if (!isAdmin) {
+
+        return api.sendMessage(
+
+`╭───────────────⭓
+│ ❌ ACCESS DENIED
+├───────────────⭔
+│ Only GC admins
+│ can enable slot.
+╰───────────────⭓`,
+
+          threadID,
+          messageID
+        );
+      }
+
+      settings.enabled = true;
+
+      await setData(
+        `slotSettings/${threadID}`,
+        settings
+      );
+
+      return api.sendMessage(
+
+`╭───────────────⭓
+│ ✅ SLOT ENABLED
+├───────────────⭔
+│ Slot gambling
+│ is now ON.
+╰───────────────⭓`,
+
+        threadID,
+        messageID
+      );
+    }
+
+    // ── SLOT OFF ────────────────────
+    if (sub === "off") {
+
+      if (!isAdmin) {
+
+        return api.sendMessage(
+
+`╭───────────────⭓
+│ ❌ ACCESS DENIED
+├───────────────⭔
+│ Only GC admins
+│ can disable slot.
+╰───────────────⭓`,
+
+          threadID,
+          messageID
+        );
+      }
+
+      settings.enabled = false;
+
+      await setData(
+        `slotSettings/${threadID}`,
+        settings
+      );
+
+      return api.sendMessage(
+
+`╭───────────────⭓
+│ 🛑 SLOT DISABLED
+├───────────────⭔
+│ Slot gambling
+│ is now OFF.
+╰───────────────⭓`,
+
+        threadID,
+        messageID
+      );
+    }
+
+    // ── CHECK IF OFF ────────────────
+    if (
+      settings.enabled === false
+    ) {
+
+      return api.sendMessage(
+
+`╭───────────────⭓
+│ 🎰 SLOT DISABLED
+├───────────────⭔
+│ This game is
+│ currently OFF
+│ in this GC.
+╰───────────────⭓`,
+
+        threadID,
+        messageID
+      );
+    }
+
     const name =
       await Users.getNameUser(
         senderID
       );
 
-    // no bet
+    // ── NO BET ─────────────────────
     if (!args[0]) {
 
       return api.sendMessage(
@@ -112,6 +252,10 @@ async function ({
 │ 📌 Usage:
 │ /slot 100
 │
+│ 🎛️ Settings:
+│ /slot on
+│ /slot off
+│
 │ 💰 Win up to 5x
 │ your money!
 ╰───────────────⭓`,
@@ -121,11 +265,10 @@ async function ({
       );
     }
 
-    // bet amount
+    // ── BET ────────────────────────
     let bet =
       parseInt(args[0]);
 
-    // invalid
     if (
       isNaN(bet) ||
       bet <= 0
@@ -145,11 +288,10 @@ async function ({
       );
     }
 
-    // get balance
+    // ── BALANCE ────────────────────
     const balance =
       await getMoney(senderID);
 
-    // not enough
     if (balance < bet) {
 
       return api.sendMessage(
@@ -169,7 +311,7 @@ async function ({
       );
     }
 
-    // spin
+    // ── SPIN ───────────────────────
     const a = randomEmoji();
     const b = randomEmoji();
     const c = randomEmoji();
@@ -177,7 +319,7 @@ async function ({
     let reward = 0;
     let result = "LOSE";
 
-    // JACKPOT
+    // jackpot
     if (
       a === b &&
       b === c
@@ -185,10 +327,9 @@ async function ({
 
       reward = bet * 5;
       result = "JACKPOT";
-
     }
 
-    // 2 MATCH
+    // 2 match
     else if (
       a === b ||
       b === c ||
@@ -197,24 +338,22 @@ async function ({
 
       reward = bet * 2;
       result = "WIN";
-
     }
 
-    // LOSE
+    // lose
     else {
 
       reward = -bet;
-
     }
 
-    // update money
+    // ── UPDATE MONEY ───────────────
     const finalBalance =
       await addMoney(
         senderID,
         reward
       );
 
-    // reward text
+    // ── REWARD TEXT ────────────────
     let rewardText = "";
 
     if (reward > 0) {
@@ -228,10 +367,9 @@ async function ({
       rewardText =
 `│ ➖ Lost:
 │ ${bet} Money`;
-
     }
 
-    // send
+    // ── SEND RESULT ────────────────
     return api.sendMessage(
 
 `╭───────────────⭓
@@ -260,6 +398,5 @@ ${rewardText}
       "SLOT ERROR:",
       e
     );
-
   }
 };
