@@ -6,7 +6,7 @@ const {
 // ── CONFIG ─────────────────────────────
 module.exports.config = {
   name: "slot",
-  version: "2.0.0",
+  version: "3.0.0",
   hasPermssion: 0,
   credits: "ChatGPT",
   description: "Simple slot gambling game",
@@ -50,8 +50,12 @@ async function addMoney(uid, amount) {
   const current =
     await getMoney(uid);
 
-  const updated =
+  let updated =
     current + amount;
+
+  // no negative
+  if (updated < 0)
+    updated = 0;
 
   await setMoney(
     uid,
@@ -109,7 +113,7 @@ async function ({
         a => a.id == senderID
       );
 
-    // ── GET SETTINGS ─────────────────
+    // ── SETTINGS ─────────────────────
     let settings =
       await getData(
         `slotSettings/${threadID}`
@@ -118,7 +122,7 @@ async function ({
     if (!settings)
       settings = {};
 
-    // default ON
+    // default enabled
     if (
       typeof settings.enabled ===
       "undefined"
@@ -136,7 +140,7 @@ async function ({
       (args[0] || "")
       .toLowerCase();
 
-    // ── SLOT ON ─────────────────────
+    // ── ENABLE ──────────────────────
     if (sub === "on") {
 
       if (!isAdmin) {
@@ -176,7 +180,7 @@ async function ({
       );
     }
 
-    // ── SLOT OFF ────────────────────
+    // ── DISABLE ─────────────────────
     if (sub === "off") {
 
       if (!isAdmin) {
@@ -216,7 +220,7 @@ async function ({
       );
     }
 
-    // ── CHECK IF OFF ────────────────
+    // ── CHECK STATUS ────────────────
     if (
       settings.enabled === false
     ) {
@@ -256,8 +260,8 @@ async function ({
 │ /slot on
 │ /slot off
 │
-│ 💰 Win up to 5x
-│ your money!
+│ 🎲 Low chance
+│ to win money.
 ╰───────────────⭓`,
 
         threadID,
@@ -311,39 +315,68 @@ async function ({
       );
     }
 
-    // ── SPIN ───────────────────────
-    const a = randomEmoji();
-    const b = randomEmoji();
-    const c = randomEmoji();
-
+    // ── SLOT SYSTEM ────────────────
     let reward = 0;
     let result = "LOSE";
 
-    // jackpot
-    if (
-      a === b &&
-      b === c
-    ) {
+    // 1-100
+    const chance =
+      Math.floor(
+        Math.random() * 100
+      ) + 1;
+
+    // visuals
+    let slotA =
+      randomEmoji();
+
+    let slotB =
+      randomEmoji();
+
+    let slotC =
+      randomEmoji();
+
+    // ── 3% JACKPOT ─────────────────
+    if (chance <= 3) {
 
       reward = bet * 5;
       result = "JACKPOT";
+
+      slotA = "💎";
+      slotB = "💎";
+      slotC = "💎";
     }
 
-    // 2 match
-    else if (
-      a === b ||
-      b === c ||
-      a === c
-    ) {
+    // ── 12% NORMAL WIN ─────────────
+    else if (chance <= 15) {
 
       reward = bet * 2;
       result = "WIN";
+
+      slotA = "🍒";
+      slotB = "🍒";
+      slotC = randomEmoji();
     }
 
-    // lose
+    // ── 85% LOSE ───────────────────
     else {
 
       reward = -bet;
+
+      while (
+        slotA === slotB ||
+        slotB === slotC ||
+        slotA === slotC
+      ) {
+
+        slotA =
+          randomEmoji();
+
+        slotB =
+          randomEmoji();
+
+        slotC =
+          randomEmoji();
+      }
     }
 
     // ── UPDATE MONEY ───────────────
@@ -375,7 +408,7 @@ async function ({
 `╭───────────────⭓
 │ 🎰 SLOT MACHINE
 ├───────────────⭔
-│ ${a} │ ${b} │ ${c}
+│ ${slotA} │ ${slotB} │ ${slotC}
 │
 │ 👤 ${name}
 │
