@@ -4,10 +4,10 @@ const moment = require("moment-timezone");
 
 module.exports.config = {
   name: "resend",
-  version: "4.0.0",
+  version: "6.0.0",
   hasPermssion: 1,
   credits: "Thọ & Mod By DuyVuong + ChatGPT",
-  description: "Resends unsent messages with attachments",
+  description: "Resend unsent messages with attachments",
   usePrefix: true,
   commandCategory: "utility",
   usages: "resend",
@@ -38,11 +38,11 @@ module.exports.handleEvent = async function ({
   if (!global.data.botID)
     global.data.botID = api.getCurrentUserID();
 
-  // ignore bot
+  // ignore bot messages
   if (senderID == global.data.botID)
     return;
 
-  // check if resend enabled
+  // resend status
   const threadData =
     (await Threads.getData(threadID)).data || {};
 
@@ -68,7 +68,7 @@ module.exports.handleEvent = async function ({
     );
   }
 
-  // save messages
+  // SAVE NORMAL MESSAGE
   if (event.type !== "message_unsend") {
 
     global.logMessage.set(messageID, {
@@ -76,7 +76,8 @@ module.exports.handleEvent = async function ({
       senderID,
       senderName,
 
-      body: body || "No text",
+      body:
+        body || "No text",
 
       attachments:
         event.attachments || [],
@@ -90,7 +91,7 @@ module.exports.handleEvent = async function ({
     return;
   }
 
-  // detect unsend
+  // UNSEND DETECTED
   const msgData =
     global.logMessage.get(messageID);
 
@@ -102,35 +103,9 @@ module.exports.handleEvent = async function ({
       .tz("Asia/Manila")
       .format("hh:mm A | MMM DD YYYY");
 
-  let sendMsg = {
+  let attachments = [];
 
-    body:
-`🚨 MESSAGE UNSENT
-
-👤 Name: ${msgData.senderName}
-
-💬 Message:
-${msgData.body}
-
-📎 Attachments:
-${msgData.attachments.length}
-
-⏰ Sent:
-${msgData.timeSent}
-
-🗑️ Unsent:
-${unsentTime}`,
-
-    attachment: [],
-
-    mentions: [{
-      tag: msgData.senderName,
-      id: msgData.senderID,
-      fromIndex: 0
-    }]
-  };
-
-  // download attachments
+  // DOWNLOAD ATTACHMENTS
   for (let i = 0; i < msgData.attachments.length; i++) {
 
     try {
@@ -159,32 +134,70 @@ ${unsentTime}`,
         __dirname +
         `/cache/resend_${Date.now()}_${i}.${ext}`;
 
-      const response =
-        await axios.get(file.url, {
-          responseType: "arraybuffer"
-        });
+      // STREAM DOWNLOAD
+      const response = await axios({
+        url: file.url,
+        method: "GET",
+        responseType: "stream"
+      });
 
-      fs.writeFileSync(
-        filePath,
-        Buffer.from(response.data)
-      );
+      await new Promise((resolve, reject) => {
 
-      sendMsg.attachment.push(
+        const writer =
+          fs.createWriteStream(filePath);
+
+        response.data.pipe(writer);
+
+        writer.on("finish", resolve);
+
+        writer.on("error", reject);
+      });
+
+      attachments.push(
         fs.createReadStream(filePath)
       );
 
     } catch (e) {
+
       console.log(
-        "[RESEND ATTACHMENT ERROR]",
+        "[RESEND ERROR]",
         e.message
       );
     }
   }
 
-  return api.sendMessage(
-    sendMsg,
-    threadID
-  );
+  // SEND MESSAGE
+  return api.sendMessage({
+
+    attachment:
+      attachments.length > 0
+        ? attachments
+        : undefined,
+
+    body:
+`🚨 MESSAGE UNSENT
+
+👤 Name: ${msgData.senderName}
+
+💬 Message:
+${msgData.body}
+
+📎 Attachments:
+${msgData.attachments.length}
+
+⏰ Sent:
+${msgData.timeSent}
+
+🗑️ Unsent:
+${unsentTime}`,
+
+    mentions: [{
+      tag: msgData.senderName,
+      id: msgData.senderID,
+      fromIndex: 0
+    }]
+
+  }, threadID);
 };
 
 module.exports.run = async function ({
