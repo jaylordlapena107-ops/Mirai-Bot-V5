@@ -2,7 +2,8 @@ const { getData, setData } = require("../../database.js");
 
 module.exports.config = {
   name: "invite",
-  version: "2.0.0",
+  eventType: ["log:subscribe"],
+  version: "2.1.0",
   hasPermssion: 1,
   credits: "ChatGPT",
   description: "Track member invitations",
@@ -57,8 +58,8 @@ async function addMoney(uid, amount) {
   return updated;
 }
 
-// ── HANDLE JOIN EVENT ─────────────────────
-module.exports.handleEvent = async function ({
+// ── EVENT ─────────────────────────────────
+module.exports.run = async function ({
   api,
   event,
   Users
@@ -89,8 +90,8 @@ module.exports.handleEvent = async function ({
     // ignore if bot added
     const isBotAdded =
       addedUsers.some(
-        u =>
-          String(u.userFbId)
+        user =>
+          String(user.userFbId)
           === botID
       );
 
@@ -106,7 +107,7 @@ module.exports.handleEvent = async function ({
         inviterID
       );
 
-    // get invite database
+    // get invite data
     let data =
       await getData(
         `inviteSystem/${threadID}`
@@ -123,18 +124,17 @@ module.exports.handleEvent = async function ({
       };
     }
 
-    // add invite count
+    // add invites
     data[inviterID].count +=
       addedUsers.length;
 
-    // save invite data
+    // save
     await setData(
       `inviteSystem/${threadID}`,
       data
     );
 
-    // ── MONEY REWARD ─────────────────
-
+    // reward
     const reward =
       50 * addedUsers.length;
 
@@ -144,7 +144,6 @@ module.exports.handleEvent = async function ({
         reward
       );
 
-    // total invites
     const totalInvites =
       data[inviterID].count;
 
@@ -154,17 +153,17 @@ module.exports.handleEvent = async function ({
     for (const user of addedUsers) {
 
       addedText +=
-`👤 ${user.fullName}
+`│ 👤 ${user.fullName}
 `;
     }
 
-    // send message
+    // send
     return api.sendMessage(
 
 `╭───────────────⭓
 │ 🎉 MEMBER INVITED
 ├───────────────⭔
-${addedText}
+${addedText}│
 │ 📨 Invited By:
 │ ${inviterName}
 │
@@ -192,7 +191,11 @@ ${addedText}
 };
 
 // ── COMMANDS ─────────────────────────────
-module.exports.run = async function ({
+module.exports.handleEvent =
+module.exports.handleEvent || 
+async function () {};
+
+module.exports.command = async function ({
   api,
   event,
   args,
@@ -210,7 +213,7 @@ module.exports.run = async function ({
       (args[0] || "")
       .toLowerCase();
 
-    // ── TOP ──────────────────────────
+    // TOP
     if (option === "top") {
 
       let data =
@@ -262,9 +265,7 @@ module.exports.run = async function ({
       ] of sorted) {
 
         const name =
-          await Users.getNameUser(
-            uid
-          );
+          await Users.getNameUser(uid);
 
         msg +=
 
@@ -286,7 +287,7 @@ module.exports.run = async function ({
       );
     }
 
-    // ── RESET ────────────────────────
+    // RESET
     if (option === "reset") {
 
       await setData(
@@ -307,7 +308,7 @@ module.exports.run = async function ({
       );
     }
 
-    // ── DEFAULT ──────────────────────
+    // DEFAULT
     return api.sendMessage(
 
 `╭───────────────⭓
@@ -333,3 +334,7 @@ module.exports.run = async function ({
 
   }
 };
+
+// alias
+module.exports.runCommand =
+module.exports.command;
