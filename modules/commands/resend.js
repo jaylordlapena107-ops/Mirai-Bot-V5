@@ -1,20 +1,18 @@
 const fs = require("fs-extra");
 const axios = require("axios");
-const request = require("request");
 const moment = require("moment-timezone");
 
 module.exports.config = {
   name: "resend",
-  version: "4.0.0",
+  version: "5.0.0",
   hasPermssion: 1,
   credits: "Thọ & Mod By DuyVuong + ChatGPT",
-  description: "Resend unsent messages with attachment",
+  description: "Resend unsent messages with attachment save",
   usePrefix: true,
   commandCategory: "utility",
   usages: "resend",
   cooldowns: 0,
   dependencies: {
-    request: "",
     "fs-extra": "",
     axios: "",
     "moment-timezone": ""
@@ -53,7 +51,7 @@ module.exports.handleEvent = async function ({
   if (threadData.resend === false)
     return;
 
-  // get name
+  // get sender name
   let senderName =
     global.data.userName.get(senderID);
 
@@ -72,15 +70,80 @@ module.exports.handleEvent = async function ({
     );
   }
 
-  // save normal messages
+  // SAVE MESSAGE
   if (type !== "message_unsend") {
+
+    let savedAttachments = [];
+
+    if (
+      attachments &&
+      attachments.length > 0
+    ) {
+
+      let num = 0;
+
+      for (const att of attachments) {
+
+        try {
+
+          num++;
+
+          let ext = "jpg";
+
+          if (att.type === "photo")
+            ext = "jpg";
+
+          else if (att.type === "video")
+            ext = "mp4";
+
+          else if (att.type === "audio")
+            ext = "mp3";
+
+          else if (
+            att.type === "animated_image"
+          )
+            ext = "gif";
+
+          else if (
+            att.type === "file"
+          )
+            ext = "bin";
+
+          const pathFile =
+            __dirname +
+            `/cache/${messageID}_${num}.${ext}`;
+
+          const data =
+            (
+              await axios.get(att.url, {
+                responseType: "arraybuffer"
+              })
+            ).data;
+
+          fs.writeFileSync(
+            pathFile,
+            Buffer.from(data)
+          );
+
+          savedAttachments.push(pathFile);
+
+        } catch (e) {
+
+          console.log(
+            "[RESEND SAVE ERROR]",
+            e.message
+          );
+        }
+      }
+    }
 
     global.logMessage.set(messageID, {
 
-      msgBody: body || "No text",
+      msgBody:
+        body || "No text",
 
       attachment:
-        attachments || [],
+        savedAttachments,
 
       senderName,
 
@@ -89,13 +152,15 @@ module.exports.handleEvent = async function ({
       timeSent:
         moment()
           .tz("Asia/Manila")
-          .format("hh:mm A | MMM DD YYYY")
+          .format(
+            "hh:mm A | MMM DD YYYY"
+          )
     });
 
     return;
   }
 
-  // detect unsend
+  // DETECT UNSEND
   const getMsg =
     global.logMessage.get(messageID);
 
@@ -105,41 +170,10 @@ module.exports.handleEvent = async function ({
   const unsentTime =
     moment()
       .tz("Asia/Manila")
-      .format("hh:mm A | MMM DD YYYY");
+      .format(
+        "hh:mm A | MMM DD YYYY"
+      );
 
-  // no attachment
-  if (
-    !getMsg.attachment ||
-    getMsg.attachment.length === 0
-  ) {
-
-    return api.sendMessage({
-      body:
-`🚨 MESSAGE UNSENT
-
-👤 Name: ${getMsg.senderName}
-
-💬 Message:
-${getMsg.msgBody}
-
-⏰ Sent:
-${getMsg.timeSent}
-
-🗑️ Unsent:
-${unsentTime}`,
-
-      mentions: [{
-        tag: getMsg.senderName,
-        id: getMsg.senderID,
-        fromIndex: 0
-      }]
-    },
-    threadID,
-    null,
-    messageID);
-  }
-
-  // with attachment
   let msg = {
 
     body:
@@ -168,79 +202,33 @@ ${unsentTime}`,
     }]
   };
 
-  let filePaths = [];
-  let num = 0;
-
-  for (const i of getMsg.attachment) {
+  // attach saved files
+  for (const filePath of getMsg.attachment) {
 
     try {
 
-      num++;
+      if (
+        fs.existsSync(filePath)
+      ) {
 
-      const getURL =
-        await request.get(i.url);
-
-      const pathname =
-        getURL.uri.pathname;
-
-      let ext = "jpg";
-
-      if (i.type === "photo")
-        ext = "jpg";
-
-      else if (i.type === "video")
-        ext = "mp4";
-
-      else if (i.type === "audio")
-        ext = "mp3";
-
-      else if (i.type === "animated_image")
-        ext = "gif";
-
-      else if (pathname.includes("."))
-        ext = pathname.substring(
-          pathname.lastIndexOf(".") + 1
+        msg.attachment.push(
+          fs.createReadStream(filePath)
         );
-
-      const pathFile =
-        __dirname +
-        `/cache/${Date.now()}_${num}.${ext}`;
-
-      const data =
-        (
-          await axios.get(i.url, {
-            responseType: "arraybuffer"
-          })
-        ).data;
-
-      fs.writeFileSync(
-        pathFile,
-        Buffer.from(data)
-      );
-
-      filePaths.push(pathFile);
-
-      msg.attachment.push(
-        fs.createReadStream(pathFile)
-      );
+      }
 
     } catch (e) {
 
-      console.log(e);
+      console.log(
+        "[RESEND READ ERROR]",
+        e.message
+      );
     }
   }
 
-  api.sendMessage(
+  return api.sendMessage(
     msg,
     threadID,
-    () => {
-
-      for (const path of filePaths) {
-
-        if (fs.existsSync(path))
-          fs.unlinkSync(path);
-      }
-    },
+    null,
     messageID
   );
 };
@@ -257,10 +245,12 @@ module.exports.run = async function ({
   } = event;
 
   const data =
-    (await Threads.getData(threadID)).data || {};
+    (await Threads.getData(threadID))
+      .data || {};
 
   if (
-    typeof data.resend === "undefined" ||
+    typeof data.resend ===
+      "undefined" ||
     data.resend === false
   )
 
