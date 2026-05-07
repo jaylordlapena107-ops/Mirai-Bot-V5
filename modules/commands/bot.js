@@ -4,13 +4,14 @@ const { getData, setData } = require("../../database.js");
 // ── CONFIG ─────────────────────────────────────────────
 const AI_NAME = "BARKADA AI";
 const VERSION = "1.0.0";
-const CREATOR = "Angelica Mateo";
+const CREATOR = "Jaylord La Peña";
 
 const SYSTEM_PROMPT =
   `You are ${AI_NAME} version ${VERSION}, created by ${CREATOR}.\n` +
   `You are friendly, funny, helpful, and casual.\n` +
   `Reply in Filipino if user speaks Filipino.\n` +
   `Reply in English if user speaks English.\n` +
+  `Do not use the word "weh" in replies.\n` +
   `Keep replies natural and conversational.`;
 
 // ── MEMORY ─────────────────────────────────────────────
@@ -43,6 +44,22 @@ async function setBotStatus(threadID, status) {
   await setData(`botStatus/${threadID}`, data);
 }
 
+// ── CLEAN RESPONSE ─────────────────────────────────────
+function cleanReply(text) {
+  if (!text) return "Wala akong maisagot.";
+
+  // remove "weh"
+  text = text.replace(/\bweh\b/gi, "");
+
+  // remove extra spaces
+  text = text.replace(/\s+/g, " ").trim();
+
+  // remove double punctuation
+  text = text.replace(/([!?.,])\1+/g, "$1");
+
+  return text;
+}
+
 // ── CHAT API ───────────────────────────────────────────
 async function chat(message, uid, name, threadID) {
   const h = history.get(threadID) || [];
@@ -68,6 +85,9 @@ async function chat(message, uid, name, threadID) {
     let reply =
       res.data?.reply ||
       "Wala akong maisagot.";
+
+    // clean AI response
+    reply = cleanReply(reply);
 
     h.push({
       role: "assistant",
