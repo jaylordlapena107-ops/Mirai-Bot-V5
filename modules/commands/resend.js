@@ -1,7 +1,9 @@
+const { getData, setData } = require("../../database.js");
+
 module.exports.config = {
   name: "resend",
-  version: "4.0.0",
-  hasPermssion: 1,
+  version: "5.2.0",
+  hasPermssion: 0,
   credits: "Thọ & Edited",
   description: "Resend unsent text messages",
   usePrefix: true,
@@ -11,11 +13,11 @@ module.exports.config = {
   hide: true
 };
 
+// ── HANDLE EVENTS ─────────────────────────────────
 module.exports.handleEvent = async function ({
   event,
   api,
-  Users,
-  Threads
+  Users
 }) {
 
   try {
@@ -27,56 +29,80 @@ module.exports.handleEvent = async function ({
       body
     } = event;
 
+    // create storage
     if (!global.logMessage)
       global.logMessage = new Map();
 
+    // bot id
     if (!global.data.botID)
-      global.data.botID = api.getCurrentUserID();
+      global.data.botID =
+        api.getCurrentUserID();
 
-    // Ignore bot messages
-    if (senderID == global.data.botID)
+    // ignore bot messages
+    if (
+      String(senderID) ===
+      String(global.data.botID)
+    ) return;
+
+    // get resend status
+    let data =
+      await getData(
+        `resend/${threadID}`
+      );
+
+    if (!data)
+      data = {};
+
+    // resend off
+    if (data.enabled === false)
       return;
 
-    // Thread settings
-    const threadData =
-      (await Threads.getData(threadID)).data || {};
-
-    // Resend OFF
-    if (threadData.resend === false)
-      return;
-
-    // SAVE TEXT MESSAGE ONLY
+    // save text messages only
     if (
       event.type !== "message_unsend" &&
       body
     ) {
 
-      global.logMessage.set(messageID, {
-        body,
-        senderID
-      });
+      global.logMessage.set(
+        messageID,
+        {
+          body,
+          senderID
+        }
+      );
 
       return;
     }
 
-    // DETECT UNSEND
-    if (event.type === "message_unsend") {
+    // detect unsend
+    if (
+      event.type ===
+      "message_unsend"
+    ) {
 
       const msgData =
-        global.logMessage.get(messageID);
+        global.logMessage.get(
+          messageID
+        );
 
       if (!msgData)
         return;
 
       const name =
-        await Users.getNameUser(senderID);
+        await Users.getNameUser(
+          senderID
+        );
 
       return api.sendMessage(
-`🚨 MESSAGE UNSENT
 
-👤 ${name}
+`╭───────────────⭓
+│ 🚨 MESSAGE UNSENT
+├───────────────⭔
+│ 👤 ${name}
+│
+│ 💬 ${msgData.body}
+╰───────────────⭓`,
 
-💬 ${msgData.body}`,
         threadID
       );
     }
@@ -91,48 +117,100 @@ module.exports.handleEvent = async function ({
   }
 };
 
+// ── COMMAND ───────────────────────────────────────
 module.exports.run = async function ({
   api,
-  event,
-  Threads
+  event
 }) {
 
-  const {
-    threadID,
-    messageID
-  } = event;
+  try {
 
-  const data =
-    (await Threads.getData(threadID)).data || {};
+    const {
+      threadID,
+      messageID,
+      senderID
+    } = event;
 
-  if (
-    typeof data.resend === "undefined" ||
-    data.resend === false
-  ) {
+    // get thread info
+    const threadInfo =
+      await api.getThreadInfo(
+        threadID
+      );
 
-    data.resend = true;
+    // check admin
+    const isAdmin =
+      threadInfo.adminIDs.some(
+        admin =>
+          String(admin.id) ===
+          String(senderID)
+      );
 
-  } else {
+    // deny access
+    if (!isAdmin) {
 
-    data.resend = false;
+      return api.sendMessage(
+
+`╭───────────────⭓
+│ ⚠️ ACCESS DENIED
+├───────────────⭔
+│ Only group admins
+│ can use this command.
+╰───────────────⭓`,
+
+        threadID,
+        messageID
+      );
+    }
+
+    // get data
+    let data =
+      await getData(
+        `resend/${threadID}`
+      );
+
+    if (!data)
+      data = {};
+
+    // toggle
+    if (
+      typeof data.enabled ===
+      "undefined" ||
+      data.enabled === false
+    ) {
+
+      data.enabled = true;
+
+    } else {
+
+      data.enabled = false;
+
+    }
+
+    // save database
+    await setData(
+      `resend/${threadID}`,
+      data
+    );
+
+    return api.sendMessage(
+
+`╭───────────────⭓
+│ 📡 RESEND SYSTEM
+├───────────────⭔
+│ Status:
+│ ${data.enabled ? "✅ ENABLED" : "❌ DISABLED"}
+╰───────────────⭓`,
+
+      threadID,
+      messageID
+    );
+
+  } catch (e) {
+
+    console.log(
+      "RESEND CMD ERROR:",
+      e.message
+    );
 
   }
-
-  await Threads.setData(
-    threadID,
-    { data }
-  );
-
-  global.data.threadData.set(
-    parseInt(threadID),
-    data
-  );
-
-  return api.sendMessage(
-    `✅ Resend is now ${
-      data.resend ? "ON" : "OFF"
-    }`,
-    threadID,
-    messageID
-  );
 };
