@@ -2,7 +2,7 @@ const axios = require("axios");
 
 module.exports.config = {
   name: "mccmd",
-  version: "2.0.0",
+  version: "3.0.0",
   credits: "ChatGPT",
   description:
     "Send Minecraft commands from Facebook",
@@ -20,7 +20,7 @@ const BOT_OWNER = [
   "61559999326713"
 ];
 
-// allowed for gc admins
+// allowed commands for gc admins
 const ADMIN_COMMANDS = [
   "/jail",
   "/cmi jail",
@@ -46,12 +46,15 @@ async function ({
 
     return api.sendMessage(
 
-`📌 Usage:
- /mccmd <command>
+`╔══════════════╗
+║ 📌 MCCMD USAGE
+╚══════════════╝
+
+/mccmd <command>
 
 Example:
- /mccmd /kick Steve
- /mccmd /jail Steve`,
+• /mccmd /kick Steve
+• /mccmd /jail Steve`,
 
       threadID,
       messageID
@@ -62,7 +65,7 @@ Example:
   const fullCmd =
     args.join(" ").trim();
 
-  // check gc admin
+  // get gc info
   let isAdmin = false;
 
   try {
@@ -92,20 +95,20 @@ Example:
       senderID
     );
 
-  // if not owner
+  // not owner
   if (!isOwner) {
 
-    // must be admin
+    // must be gc admin
     if (!isAdmin) {
 
       return api.sendMessage(
-        "❌ Only GC admins can use this.",
+        "❌ Only GC admins can use this command.",
         threadID,
         messageID
       );
     }
 
-    // allowed cmds only
+    // check allowed command
     const lower =
       fullCmd.toLowerCase();
 
@@ -119,7 +122,11 @@ Example:
 
       return api.sendMessage(
 
-`❌ GC Admins can only use:
+`╔══════════════╗
+║ ❌ NOT ALLOWED
+╚══════════════╝
+
+GC Admins can only use:
 
 • /jail
 • /cmi jail
@@ -134,13 +141,9 @@ Example:
 
   try {
 
-    // unique key
-    const commandID =
-      "cmd_" + Date.now();
-
     // firebase path
     const path =
-      `${FIREBASE_URL}/command/${commandID}.json`;
+      `${FIREBASE_URL}/command/com.json`;
 
     // send command
     await axios.put(
@@ -154,7 +157,7 @@ Example:
       }
     );
 
-    // react waiting
+    // waiting react
     api.setMessageReaction(
       "⏳",
       messageID,
@@ -162,7 +165,7 @@ Example:
       true
     );
 
-    // wait for execution
+    // check execution
     const interval =
       setInterval(
         async () => {
@@ -170,7 +173,9 @@ Example:
           try {
 
             const res =
-              await axios.get(path);
+              await axios.get(
+                path
+              );
 
             const data =
               res.data;
@@ -180,15 +185,15 @@ Example:
 
             // executed?
             if (
-              data.executed ===
-              "true"
+              data.executed === "true" ||
+              data.executed === true
             ) {
 
               clearInterval(
                 interval
               );
 
-              // react success
+              // success react
               api.setMessageReaction(
                 "✅",
                 messageID,
