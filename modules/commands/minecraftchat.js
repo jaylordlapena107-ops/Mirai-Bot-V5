@@ -6,7 +6,7 @@ const {
 
 module.exports.config = {
   name: "minecraftchat",
-  version: "4.0.0",
+  version: "5.0.0",
   credits: "ChatGPT",
   description:
     "Minecraft <-> Facebook Chat Bridge",
@@ -123,6 +123,12 @@ async function ({
       senderID,
       body
     } = event;
+
+    // ignore bot messages
+    if (
+      senderID ==
+      api.getCurrentUserID()
+    ) return;
 
     // ignore empty
     if (!body)
