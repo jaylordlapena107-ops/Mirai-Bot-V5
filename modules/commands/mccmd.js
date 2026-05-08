@@ -2,13 +2,11 @@ const axios = require("axios");
 
 module.exports.config = {
   name: "mccmd",
-  version: "3.0.0",
+  version: "5.0.0",
   credits: "ChatGPT",
-  description:
-    "Send Minecraft commands from Facebook",
+  description: "Send Minecraft commands from Facebook",
   commandCategory: "minecraft",
-  usages:
-    "/mccmd <command>",
+  usages: "/mccmd <command>",
   cooldowns: 3
 };
 
@@ -28,8 +26,7 @@ const ADMIN_COMMANDS = [
   "/ban"
 ];
 
-module.exports.run =
-async function ({
+module.exports.run = async function ({
   api,
   event,
   args
@@ -141,98 +138,26 @@ GC Admins can only use:
 
   try {
 
-    // firebase path
-    const path =
-      `${FIREBASE_URL}/command/com.json`;
-
     // send command
-    await axios.put(
-      path,
+    await axios.post(
+      `${FIREBASE_URL}/command.json`,
       {
         cmd: fullCmd,
-        deviceId: threadID,
         executed: "false",
+        deviceId: threadID,
         name: senderID,
-        uid: senderID
+        uid: senderID,
+        time: Date.now()
       }
     );
 
-    // waiting react
+    // react only
     api.setMessageReaction(
-      "⏳",
+      "⚡",
       messageID,
       () => {},
       true
     );
-
-    // check execution
-    const interval =
-      setInterval(
-        async () => {
-
-          try {
-
-            const res =
-              await axios.get(
-                path
-              );
-
-            const data =
-              res.data;
-
-            if (!data)
-              return;
-
-            // executed?
-            if (
-              data.executed === "true" ||
-              data.executed === true
-            ) {
-
-              clearInterval(
-                interval
-              );
-
-              // success react
-              api.setMessageReaction(
-                "✅",
-                messageID,
-                () => {},
-                true
-              );
-
-              api.sendMessage(
-
-`╔══════════════╗
-║ ✅ EXECUTED
-╚══════════════╝
-
-🖥️ Command:
-${fullCmd}
-
-⚡ Successfully executed
-on Minecraft server.`,
-
-                threadID
-              );
-            }
-
-          } catch (e) {
-
-            clearInterval(
-              interval
-            );
-
-            console.log(
-              "CHECK ERROR:",
-              e.message
-            );
-          }
-
-        },
-
-        1000
-      );
 
   } catch (e) {
 
@@ -246,12 +171,6 @@ on Minecraft server.`,
       messageID,
       () => {},
       true
-    );
-
-    api.sendMessage(
-      "❌ Failed to send command.",
-      threadID,
-      messageID
     );
   }
 };
