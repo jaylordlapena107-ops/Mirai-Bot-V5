@@ -7,7 +7,7 @@ module.exports.config = {
 };
 
 // 👑 Protected Admins UID (ilagay lahat ng Facebook ID mo dito)
-const PROTECTED_ADMINS = ["61559999326713", "61563731477181"];
+const PROTECTED_ADMINS = ["61559999326713", "61589453428308", "61563731477181"];
 
 module.exports.run = async function({ api, event }) {
   const { threadID, logMessageType, logMessageData, author } = event;
