@@ -1,4 +1,5 @@
 const axios = require("axios");
+
 const {
   getData,
   setData
@@ -6,7 +7,7 @@ const {
 
 module.exports.config = {
   name: "minecraftchat",
-  version: "5.0.0",
+  version: "5.1.0",
   credits: "ChatGPT",
   description:
     "Minecraft <-> Facebook Chat Bridge",
@@ -22,6 +23,11 @@ const FIREBASE_URL =
 
 // ── CACHE ───────────────────────────
 let lastMessageID = null;
+
+// ── IGNORED UID ─────────────────────
+const IGNORED_UIDS = [
+  "61589453428308"
+];
 
 // ── COMMAND ─────────────────────────
 module.exports.run =
@@ -128,6 +134,13 @@ async function ({
     if (
       senderID ==
       api.getCurrentUserID()
+    ) return;
+
+    // ignore specific users
+    if (
+      IGNORED_UIDS.includes(
+        String(senderID)
+      )
     ) return;
 
     // ignore empty
