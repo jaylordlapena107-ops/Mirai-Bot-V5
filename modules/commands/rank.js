@@ -3,7 +3,7 @@ const axios = require("axios");
 
 module.exports.config = {
   name: "rank",
-  version: "4.0.0",
+  version: "4.1.0",
   hasPermission: 0,
   credits: "ChatGPT + NN",
   description: "Auto rank up system with leaderboard",
@@ -28,7 +28,6 @@ const rankNames = [
 
 // ── REQUIRED XP ────────────────────────
 function getRequiredXP(level) {
-
   return level * 200;
 }
 
@@ -49,6 +48,12 @@ async function ({
       threadID,
       senderID
     } = event;
+
+    // ── IGNORE BOT ───────────────────
+    if (
+      senderID ==
+      api.getCurrentUserID()
+    ) return;
 
     const path =
       `rank/${threadID}/${senderID}`;
