@@ -42,18 +42,13 @@ module.exports.handleEvent = async function ({
     return api.sendMessage(
 `━━━━━━━━━━━━━━━
 BARKADA CRAFT SMP
-
 📡 SERVER IPs
+🎮 JAVA
+IP: barkadacraftsmp.hk-mczie.fun:4090
 
-🇵🇭 PH SERVER
-┃ JAVA IP: barkadacraftsmp.ph1-mczie.fun:4090
-┃ BEDROCK IP: barkadacraftsmp.ph1-mczie.fun
-┃ PORT: 4090
-
-🇸🇬 SG SERVER
-┃ JAVA IP: barkadacraftsmp.sg1-mczie.fun:4090
-┃ BEDROCK IP: barkadacraftsmp.sg1-mczie.fun
-┃ PORT: 4090
+📱 BEDROCK
+IP: barkadacraftsmp.hk-mczie.fun
+Port: 4090
 ━━━━━━━━━━━━━━━`,
         threadID,
         messageID
