@@ -1,5 +1,5 @@
 /**
- * joinNoti event — Welcome new members with text + voice
+ * joinNoti event — Welcome new members with voice only
  * TEAM STARTCOPE BETA
  */
 
@@ -18,7 +18,7 @@ module.exports.config = {
   eventType: ['log:subscribe'],
   version: '6.0.0',
   credits: 'Mirai Team | TEAM STARTCOPE BETA',
-  description: 'Welcome new members with text + voice',
+  description: 'Welcome new members with voice only',
 };
 
 // ── GENERATE VOICE ────────────────────────────────────
@@ -130,8 +130,7 @@ module.exports.run = async function ({
   try {
 
     const {
-      threadName,
-      participantIDs
+      threadName
     } = await api.getThreadInfo(threadID);
 
     const safeThreadName =
@@ -142,23 +141,10 @@ module.exports.run = async function ({
         .slice(0, 40) || 'Group Chat';
 
     const nameArray = [];
-    const mentions = [];
-    const memLengths = [];
-
-    let i = 0;
 
     for (const p of event.logMessageData.addedParticipants) {
 
       nameArray.push(p.fullName);
-
-      mentions.push({
-        tag: p.fullName,
-        id: p.userFbId
-      });
-
-      memLengths.push(
-        participantIDs.length - i++
-      );
 
       // save user data
       if (
@@ -181,40 +167,7 @@ module.exports.run = async function ({
       }
     }
 
-    // ── SEND WELCOME MESSAGE ──────────────────────────
-    api.sendMessage(
-      {
-        body:
-`👋 Welcome ${nameArray.join(', ')}!
-
-🎉 Welcome to ${safeThreadName}
-🔢 You are member #${memLengths[0]}
-
-━━━━━━━━━━━━━━━
-🌿 BARKADA CRAFT SMP
-━━━━━━━━━━━━━━━
-
-📡 SERVER IPs
-
-🇵🇭 PH SERVER
-┃ JAVA IP: barkadacraftsmp.ph1-mczie.fun:4090
-┃ BEDROCK IP: barkadacraftsmp.ph1-mczie.fun
-┃ PORT: 4090
-
-🇸🇬 SG SERVER
-┃ JAVA IP: barkadacraftsmp.sg1-mczie.fun:4090
-┃ BEDROCK IP: barkadacraftsmp.sg1-mczie.fun
-┃ PORT: 4090
-
-━━━━━━━━━━━━━━━
-🎮 Join to BarkadaCraft SMP now!
-`,
-        mentions
-      },
-      threadID
-    );
-
-    // ── VOICE WELCOME ─────────────────────────────────
+    // ── VOICE WELCOME ONLY ─────────────────────────────
     const firstNames = nameArray.map(name =>
       name
         .replace(/[^\x00-\x7F]/g, ' ')
