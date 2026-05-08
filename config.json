@@ -21,7 +21,7 @@
     "PASSWORD": "",
     "OTPKEY": "",
     "FACEBOOK_ADMIN": "https://www.facebook.com/share/1CqmTVrca3/",
-    "BOTNAME": "Barkada Bot",
+    "BOTNAME": "BarkadaBot2",
     "PREFIX": "/",
     "BOXADMIN": "",
     "ADMINBOT": [
@@ -29,8 +29,8 @@
         "61554885397487"
     ],
     "NDH": [
-        "502275138",
-        "61588479630286"
+        "61559999326713",
+        "61559999326713"
     ],
     "version": "3.0.0",
     "menu": {
