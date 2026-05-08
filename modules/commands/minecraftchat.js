@@ -6,10 +6,10 @@ const {
 
 module.exports.config = {
   name: "minecraftchat",
-  version: "3.0.0",
+  version: "4.0.0",
   credits: "ChatGPT",
   description:
-    "Minecraft chat bridge",
+    "Minecraft <-> Facebook Chat Bridge",
   commandCategory: "system",
   usages:
     "/minecraftchat on | off",
@@ -41,7 +41,6 @@ async function ({
     (args[0] || "")
     .toLowerCase();
 
-  // ── GET THREAD INFO ───────────────
   let isAdmin = false;
 
   try {
@@ -88,7 +87,7 @@ async function ({
     );
   }
 
-  // ── SAVE SETTINGS ─────────────────
+  // ── SAVE ──────────────────────────
   const enabled =
     sub === "on";
 
@@ -108,6 +107,73 @@ async function ({
     threadID,
     messageID
   );
+};
+
+// ── FB TO MC ───────────────────────
+module.exports.handleEvent =
+async function ({
+  api,
+  event
+}) {
+
+  try {
+
+    const {
+      threadID,
+      senderID,
+      body
+    } = event;
+
+    // ignore empty
+    if (!body)
+      return;
+
+    // ignore commands
+    if (
+      body.startsWith("/")
+    ) return;
+
+    // check enabled
+    const settings =
+      await getData(
+        `minecraftchat/${threadID}`
+      );
+
+    if (
+      !settings ||
+      !settings.enabled
+    ) return;
+
+    // get user info
+    const userInfo =
+      await api.getUserInfo(
+        senderID
+      );
+
+    const name =
+      userInfo[senderID]
+        ?.name || "Facebook";
+
+    // send to firebase
+    await axios.post(
+
+      `${FIREBASE_URL}/chat1.json`,
+
+      {
+        uid: senderID,
+        name: name,
+        message: body,
+        source: "fb"
+      }
+    );
+
+  } catch (e) {
+
+    console.log(
+      "FB TO MC ERROR:",
+      e.message
+    );
+  }
 };
 
 // ── START LISTENER ──────────────────
@@ -145,7 +211,7 @@ function ({ api }) {
         const latestKey =
           keys[keys.length - 1];
 
-        // already sent
+        // anti duplicate
         if (
           latestKey ===
           lastMessageID
@@ -168,7 +234,16 @@ function ({ api }) {
           msgData.message ||
           "No Message";
 
-        // ── GET ENABLED THREADS ─────
+        const source =
+          msgData.source ||
+          "unknown";
+
+        // MC only
+        if (
+          source !== "mc"
+        ) return;
+
+        // get enabled threads
         const settings =
           await getData(
             `minecraftchat`
@@ -182,14 +257,13 @@ function ({ api }) {
 
         for (const threadID of threadIDs) {
 
-          // check enabled
+          // enabled check
           if (
             !settings[threadID] ||
             !settings[threadID]
               .enabled
           ) continue;
 
-          // normal style chat
           api.sendMessage(
 
 `[Minecraft]
@@ -209,6 +283,6 @@ ${name}: ${message}`,
 
     },
 
-    3000
+    1000
   );
 };
