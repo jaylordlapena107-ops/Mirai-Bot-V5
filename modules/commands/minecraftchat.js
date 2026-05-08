@@ -160,7 +160,7 @@ async function ({
       userInfo[senderID]
         ?.name || "Facebook";
 
-    // send to firebase
+    // ── SEND TO FIREBASE ───────────
     await axios.post(
 
       `${FIREBASE_URL}/chat1.json`,
@@ -169,9 +169,69 @@ async function ({
         uid: senderID,
         name: name,
         message: body,
-        source: "fb"
+        source: "fb",
+        time: Date.now()
       }
     );
+
+    // ── LIMIT CHAT1 TO 20 ──────────
+    try {
+
+      const chatRes =
+        await axios.get(
+          `${FIREBASE_URL}/chat1.json`
+        );
+
+      const chatData =
+        chatRes.data;
+
+      if (chatData) {
+
+        const keys =
+          Object.keys(chatData);
+
+        // sort oldest -> newest
+        const sorted =
+          keys.sort((a, b) => {
+
+            const timeA =
+              chatData[a]?.time || 0;
+
+            const timeB =
+              chatData[b]?.time || 0;
+
+            return timeA - timeB;
+          });
+
+        // delete old messages
+        if (sorted.length > 20) {
+
+          const removeCount =
+            sorted.length - 20;
+
+          for (
+            let i = 0;
+            i < removeCount;
+            i++
+          ) {
+
+            const oldKey =
+              sorted[i];
+
+            await axios.delete(
+              `${FIREBASE_URL}/chat1/${oldKey}.json`
+            );
+          }
+        }
+      }
+
+    } catch (e) {
+
+      console.log(
+        "CHAT CLEANUP ERROR:",
+        e.message
+      );
+    }
 
   } catch (e) {
 
