@@ -15,7 +15,7 @@ const FIREBASE_URL =
 
 // OWNER UID
 const BOT_OWNER = [
-  "61559999326713"
+  "61581773373775"
 ];
 
 // allowed commands for gc admins
