@@ -19,27 +19,29 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
       dataThread.participantIDs = dataThread.participantIDs || [];
 
       switch (logMessageType) {
+
         case "log:thread-admins": {
           if (logMessageData.ADMIN_EVENT == "add_admin") {
             dataThread.adminIDs.push({ id: logMessageData.TARGET_ID });
-            api.sendMessage(`✅ Updated admin list: ${dataThread.adminIDs.length} admins`, threadID);
           } else if (logMessageData.ADMIN_EVENT == "remove_admin") {
             dataThread.adminIDs = dataThread.adminIDs.filter(item => item.id != logMessageData.TARGET_ID);
-            api.sendMessage(`✅ Updated admin list: ${dataThread.adminIDs.length} admins`, threadID);
           }
+
           logger('Refreshed admin list for thread ' + threadID, '[UPDATE DATA]');
           await setData(threadID, { threadInfo: dataThread });
           break;
         }
+
         case "log:thread-name": {
           logger('Updated thread name for ' + threadID, '[UPDATE DATA]');
           dataThread.threadName = logMessageData.name;
           await setData(threadID, { threadInfo: dataThread });
-          api.sendMessage(`📝 Group name changed to: ${logMessageData.name}`, threadID);
           break;
         }
+
         case 'log:unsubscribe': {
           const userFbId = logMessageData.leftParticipantFbId;
+
           if (userFbId == api.getCurrentUserID()) {
             logger('Deleting data for thread ' + threadID, '[DELETE DATA THREAD]');
             const index = global.data.allThreadID?.findIndex(item => item == threadID);
@@ -47,20 +49,28 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
             await delData(threadID);
             return;
           } else {
-            (await leaveNoti.run({ api, event, Users, Threads }));
+
+            // OPTIONAL: kung gusto mo pati leave notification silent
+            // comment mo ito
+            // await leaveNoti.run({ api, event, Users, Threads });
+
             const participantIndex = dataThread.participantIDs.findIndex(item => item == userFbId);
             if (participantIndex > -1) dataThread.participantIDs.splice(participantIndex, 1);
+
             const adminIndex = dataThread.adminIDs.findIndex(item => item.id == userFbId);
             if (adminIndex > -1) dataThread.adminIDs.splice(adminIndex, 1);
+
             logger('Removed user ' + userFbId, '[DELETE DATA USER]');
             await setData(threadID, { threadInfo: dataThread });
           }
           break;
         }
       }
+
     } catch (e) {
       console.error('Error updating data: ' + e);
     }
+
     return;
   };
 };
