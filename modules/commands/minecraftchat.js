@@ -26,7 +26,7 @@ let lastMessageID = null;
 
 // ── IGNORED UID ─────────────────────
 const IGNORED_UIDS = [
-  "61589453428308"
+  "61554885397487"
 ];
 
 // ── COMMAND ─────────────────────────
